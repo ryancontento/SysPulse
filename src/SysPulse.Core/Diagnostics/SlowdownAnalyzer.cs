@@ -19,9 +19,17 @@ public enum FindingAction
     None,
     SwitchToPerformance,
     OpenRecorder,
+
+    /// <summary>End <see cref="Finding.ProcessName"/>.</summary>
+    EndProcess,
 }
 
-public sealed record Finding(FindingSeverity Severity, string Title, string Detail, FindingAction Action = FindingAction.None);
+public sealed record Finding(
+    FindingSeverity Severity,
+    string Title,
+    string Detail,
+    FindingAction Action = FindingAction.None,
+    string? ProcessName = null);
 
 public sealed record SlowdownReport(
     DateTimeOffset CheckedAt,
@@ -68,20 +76,24 @@ public static class SlowdownAnalyzer
 
         // CPU load
         var cpuCulprits = Culprits(samples, p => p.CpuPercent);
+
+        // Offer to end the top app only when it's clearly a big part of the load.
+        var cpuHogName = cpuCulprits.FirstOrDefault() is { Value: >= 20 } topCpu ? topCpu.Name : null;
+        var cpuAction = cpuHogName is null ? FindingAction.None : FindingAction.EndProcess;
         if (cpuAverage >= 80 || Share(samples, s => s.CpuPercent >= 90) >= 0.5)
         {
             findings.Add(new(FindingSeverity.Problem, "The CPU is maxed out",
-                Text($"CPU load averaged {cpuAverage:0}% over {span}, so apps are waiting their turn. {Busiest(cpuCulprits)}")));
+                Text($"CPU load averaged {cpuAverage:0}% over {span}, so apps are waiting their turn. {Busiest(cpuCulprits)}"), cpuAction, cpuHogName));
         }
         else if (cpuAverage >= 50)
         {
             findings.Add(new(FindingSeverity.Warning, "The CPU is busy",
-                Text($"CPU load averaged {cpuAverage:0}% over {span}. {Busiest(cpuCulprits)}")));
+                Text($"CPU load averaged {cpuAverage:0}% over {span}. {Busiest(cpuCulprits)}"), cpuAction, cpuHogName));
         }
         else if (cpuCulprits.FirstOrDefault() is { Value: >= 20 } hog)
         {
             findings.Add(new(FindingSeverity.Warning, $"{hog.Name} is using a lot of CPU",
-                Text($"It averaged {hog.Value:0}% of the CPU over {span}, more than anything else. If you're not using it, closing it should help.")));
+                Text($"It averaged {hog.Value:0}% of the CPU over {span}, more than anything else. If you're not using it, closing it should help."), FindingAction.EndProcess, hog.Name));
         }
 
         // Memory
@@ -89,21 +101,23 @@ public static class SlowdownAnalyzer
         var hogText = memoryHogs.Count == 0
             ? ""
             : " Using the most right now: " + string.Join(", ", memoryHogs.Select(p => $"{p.Name} ({Size(p.MemoryBytes)})")) + ".";
+        var memoryHogName = memoryHogs.FirstOrDefault()?.Name;
+        var memoryAction = memoryHogName is null ? FindingAction.None : FindingAction.EndProcess;
 
         if (memoryAverage >= 90)
         {
             findings.Add(new(FindingSeverity.Problem, "Memory is nearly full",
-                Text($"Memory use averaged {memoryAverage:0}% over {span}. When memory runs out, Windows moves data to the disk and everything stutters.{hogText} Closing some of those will help, and if this happens often, more RAM would too.")));
+                Text($"Memory use averaged {memoryAverage:0}% over {span}. When memory runs out, Windows moves data to the disk and everything stutters.{hogText} Closing some of those will help, and if this happens often, more RAM would too."), memoryAction, memoryHogName));
         }
         else if (memoryAverage >= 80)
         {
             findings.Add(new(FindingSeverity.Warning, "Memory is getting full",
-                Text($"Memory use averaged {memoryAverage:0}% over {span}.{hogText}")));
+                Text($"Memory use averaged {memoryAverage:0}% over {span}.{hogText}"), memoryAction, memoryHogName));
         }
         else if (current.Memory.TotalBytes > 0 && memoryHogs.FirstOrDefault() is { } top && top.MemoryBytes >= current.Memory.TotalBytes * 0.3)
         {
             findings.Add(new(FindingSeverity.Info, $"{top.Name} is using a lot of memory",
-                Text($"It's using {Size(top.MemoryBytes)}, about {100.0 * top.MemoryBytes / current.Memory.TotalBytes:0}% of your RAM. That's fine while there's memory to spare.")));
+                Text($"It's using {Size(top.MemoryBytes)}, about {100.0 * top.MemoryBytes / current.Memory.TotalBytes:0}% of your RAM. That's fine while there's memory to spare."), FindingAction.EndProcess, top.Name));
         }
 
         // Disk

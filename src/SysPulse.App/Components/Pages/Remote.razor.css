@@ -86,6 +86,51 @@
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 8px var(--lamp);
 }
 
+.networks {
+    display: flex;
+    flex-direction: column;
+    margin-top: 4px;
+}
+
+.network {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px dashed var(--border);
+}
+
+.network-lamp {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    background: var(--track);
+    border-radius: 50%;
+}
+
+.network-lamp.on {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.network-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.network-tag {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
 .actions {
     display: flex;
     flex-wrap: wrap;

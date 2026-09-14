@@ -1,0 +1,48 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 7, 6, 0.62);
+}
+
+.dialog {
+    width: min(420px, calc(100vw - 32px));
+    padding: 18px 20px;
+    background: linear-gradient(180deg, var(--bg-raised), var(--bg-card) 72px);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+
+.dialog-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.dialog-message {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.button.danger {
+    color: #fff;
+    background: #b3402f;
+}
+
+.button.danger:hover {
+    filter: brightness(1.12);
+}

@@ -1,0 +1,47 @@
+# Pushing a version tag (e.g. `git tag v0.5.0` then `git push origin v0.5.0`) publishes SysPulse and attaches
+# two zips to a GitHub Release:
+#   SysPulse-<version>-win-x64.zip                 needs the .NET 10 Desktop Runtime
+#   SysPulse-<version>-win-x64-self-contained.zip  runs on any 64-bit Windows 10/11, larger download
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $project = 'src/SysPulse.App'
+
+          dotnet publish $project -c Release -r win-x64 --self-contained false -p:Version=$version -o out/framework
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          dotnet publish $project -c Release -r win-x64 --self-contained true -p:Version=$version -o out/self-contained
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # Debug symbols aren't needed to run the app.
+          Get-ChildItem out -Recurse -Filter *.pdb | Remove-Item
+
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path out/framework/* -DestinationPath "dist/SysPulse-$version-win-x64.zip"
+          Compress-Archive -Path out/self-contained/* -DestinationPath "dist/SysPulse-$version-win-x64-self-contained.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

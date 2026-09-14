@@ -1,3 +1,12 @@
+@using System.Diagnostics
+@using Microsoft.JSInterop
+@implements IDisposable
+@inject IProcessActions Actions
+@inject ISettingsService SettingsService
+@inject IPowerProfileService Power
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
 <section class="card processes">
     <div class="scroll">
         <table>
@@ -26,7 +35,10 @@
                 @foreach (var process in SortedRows())
                 {
                     var (ramValue, ramUnit) = Units.Size(process.MemoryBytes, minUnit: 2);
-                    <tr @key="RowKey(process)">
+                    <tr @key="RowKey(process)"
+                        class="@(IsMenuTarget(process) ? "menu-target" : null)"
+                        @oncontextmenu="e => OpenMenuAsync(e, process)"
+                        @oncontextmenu:preventDefault="true">
                         <td class="name" title="@RowTitle(process)">
                             @process.Name
                             @if (process.InstanceCount > 1)
@@ -54,10 +66,61 @@
             </tbody>
         </table>
     </div>
+
+    @if (_status is { } status)
+    {
+        <div class="action-status @(status.Success ? null : "failed")" role="status">@status.Message</div>
+    }
 </section>
+
+@if (_menu is { } menu)
+{
+    var isProtected = Actions.IsProtected(menu.Name);
+
+    <div class="menu-backdrop" @onclick="CloseMenu" @oncontextmenu="CloseMenu" @oncontextmenu:preventDefault="true"></div>
+    <div class="menu" role="menu" style="left: @Px(menu.X); top: @Px(menu.Y)">
+        <div class="menu-title" title="@menu.Name">@menu.Name@(menu.InstanceCount > 1 ? $" ×{menu.InstanceCount}" : "")</div>
+
+        @if (isProtected)
+        {
+            <div class="menu-note">Part of Windows, so it can't be ended or changed here.</div>
+        }
+        else
+        {
+            <button type="button" class="menu-item danger" role="menuitem" @onclick="AskToEnd">End process…</button>
+        }
+        <button type="button" class="menu-item" role="menuitem" @onclick="OpenFileLocation">Open file location</button>
+
+        @if (!isProtected)
+        {
+            <div class="menu-separator"></div>
+            <div class="menu-label">Priority</div>
+            @foreach (var (priority, label) in Priorities)
+            {
+                <button type="button" class="menu-item indent" role="menuitem" @onclick="() => SetPriorityAsync(priority)">@label</button>
+            }
+        }
+
+        <div class="menu-separator"></div>
+        <button type="button" class="menu-item" role="menuitem" @onclick="CreateRule">Create a rule for this app</button>
+        <button type="button" class="menu-item" role="menuitem" @onclick="CopyNameAsync">Copy name</button>
+    </div>
+}
+
+<ConfirmDialog Visible="_confirmEnd is not null"
+               Title="@($"End {_confirmEnd?.Name}?")"
+               Message="@EndMessage"
+               ConfirmText="End process"
+               Danger="true"
+               OnConfirm="EndConfirmedAsync"
+               OnCancel="() => _confirmEnd = null" />
 
 @code {
     private const double HotPercent = 25;
+
+    // Used to keep the menu on screen near the window edges.
+    private const double MenuWidth = 220;
+    private const double MenuHeight = 300;
 
     private static readonly Column[] Columns =
     [
@@ -69,8 +132,22 @@
         new(SortColumn.Upload, "Up", "num"),
     ];
 
+    private static readonly (ProcessPriorityClass Priority, string Label)[] Priorities =
+    [
+        (ProcessPriorityClass.BelowNormal, "Below normal"),
+        (ProcessPriorityClass.Normal, "Normal"),
+        (ProcessPriorityClass.High, "High"),
+    ];
+
     private SortColumn _sortColumn = SortColumn.Cpu;
     private bool _descending = true;
+
+    // Captured when the menu opens; the row's metrics record is replaced every sample.
+    private MenuTarget? _menu;
+    private MenuTarget? _confirmEnd;
+    private ProcessActionResult? _status;
+    private int _statusVersion;
+    private bool _disposed;
 
     [Parameter, EditorRequired] public IReadOnlyList<ProcessMetrics> Processes { get; set; } = [];
 
@@ -78,6 +155,128 @@
     [Parameter] public bool NetworkAvailable { get; set; }
 
     [Parameter] public int MaxRows { get; set; } = 50;
+
+    private string EndMessage => _confirmEnd switch
+    {
+        { InstanceCount: > 1 } target => $"This closes all {target.InstanceCount} {target.Name} processes. Anything unsaved in them will be lost.",
+        { } target => $"Anything unsaved in {target.Name} will be lost.",
+        _ => "",
+    };
+
+    private async Task OpenMenuAsync(MouseEventArgs e, ProcessMetrics process)
+    {
+        double x = e.ClientX, y = e.ClientY;
+        try
+        {
+            var viewport = await JS.InvokeAsync<double[]>("sysPulseViewport");
+            x = Math.Max(8, Math.Min(x, viewport[0] - MenuWidth - 8));
+            if (y + MenuHeight > viewport[1] - 8)
+                y = Math.Max(8, y - MenuHeight);
+        }
+        catch (JSException)
+        {
+            // Fall back to the click position.
+        }
+
+        _menu = new MenuTarget(process.Name, process.ProcessId, process.InstanceCount, x, y);
+    }
+
+    private void CloseMenu() => _menu = null;
+
+    private bool IsMenuTarget(ProcessMetrics process) =>
+        _menu is { } menu && menu.ProcessId == process.ProcessId && menu.Name == process.Name;
+
+    private void AskToEnd()
+    {
+        _confirmEnd = _menu;
+        _menu = null;
+    }
+
+    private async Task EndConfirmedAsync()
+    {
+        if (_confirmEnd is not { } target)
+            return;
+
+        _confirmEnd = null;
+        var result = await Task.Run(() => Actions.End(target.Name, target.ProcessId));
+        await ShowStatusAsync(result);
+    }
+
+    private async Task OpenFileLocation()
+    {
+        if (_menu is not { } target)
+            return;
+
+        _menu = null;
+        var result = await Task.Run(() => Actions.OpenFileLocation(target.Name, target.ProcessId));
+        if (!result.Success)
+            await ShowStatusAsync(result);
+    }
+
+    private async Task SetPriorityAsync(ProcessPriorityClass priority)
+    {
+        if (_menu is not { } target)
+            return;
+
+        _menu = null;
+        var result = await Task.Run(() => Actions.SetPriority(target.Name, target.ProcessId, priority));
+        await ShowStatusAsync(result);
+    }
+
+    // Adds "When the app X is running → switch to Performance" (or notify, without power modes) and opens the rules.
+    private void CreateRule()
+    {
+        if (_menu is not { } target)
+            return;
+
+        _menu = null;
+        SettingsService.Update(s =>
+            s.Rules.Count >= AppSettings.MaxRules
+            || s.Rules.Any(r => r.Trigger == RuleTrigger.ProcessRunning && string.Equals(r.ProcessName, target.Name, StringComparison.OrdinalIgnoreCase))
+                ? s
+                : s with
+                {
+                    Rules =
+                    [
+                        .. s.Rules,
+                        new AlertRule
+                        {
+                            Trigger = RuleTrigger.ProcessRunning,
+                            ProcessName = target.Name,
+                            Action = Power.IsSupported ? RuleAction.SwitchProfile : RuleAction.Notify,
+                            Profile = PowerProfile.Performance,
+                        },
+                    ],
+                });
+
+        Navigation.NavigateTo("rules");
+    }
+
+    private async Task CopyNameAsync()
+    {
+        if (_menu is not { } target)
+            return;
+
+        _menu = null;
+        System.Windows.Clipboard.SetText(target.Name);
+        await ShowStatusAsync(new ProcessActionResult(true, $"Copied \"{target.Name}\"."));
+    }
+
+    private async Task ShowStatusAsync(ProcessActionResult result)
+    {
+        _status = result;
+        var version = ++_statusVersion;
+        StateHasChanged();
+
+        await Task.Delay(TimeSpan.FromSeconds(result.Success ? 4 : 8));
+
+        // Only clear it if no newer message replaced it meanwhile.
+        if (!_disposed && version == _statusVersion)
+        {
+            _status = null;
+            StateHasChanged();
+        }
+    }
 
     private void SortBy(SortColumn column)
     {
@@ -128,16 +327,22 @@
     // Grouped rows are unique by name; ungrouped rows can share a name, so key them by PID.
     private static object RowKey(ProcessMetrics process) => (object?)process.ProcessId ?? process.Name;
 
-    private static string? RowTitle(ProcessMetrics process) =>
-        process.ProcessId is { } id ? $"PID {id}"
-        : process.InstanceCount > 1 ? $"{process.InstanceCount} processes"
-        : null;
+    private static string RowTitle(ProcessMetrics process) =>
+        (process.ProcessId is { } id ? $"PID {id} · "
+            : process.InstanceCount > 1 ? $"{process.InstanceCount} processes · "
+            : "") + "Right-click for actions";
 
     private static string? HotClass(double percent) => percent >= HotPercent ? "hot" : null;
 
     private static string WholeNumber(double value) => Math.Round(value).ToString("0", CultureInfo.CurrentCulture);
 
+    private static string Px(double value) => value.ToString("0", CultureInfo.InvariantCulture) + "px";
+
+    public void Dispose() => _disposed = true;
+
     private enum SortColumn { Name, Cpu, Gpu, Ram, Download, Upload }
 
     private sealed record Column(SortColumn Key, string Title, string CssClass);
+
+    private sealed record MenuTarget(string Name, int? ProcessId, int InstanceCount, double X, double Y);
 }

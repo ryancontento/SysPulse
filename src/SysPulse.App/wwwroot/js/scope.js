@@ -40,3 +40,6 @@ window.sysPulseScope = {
         element?._sysPulseScope?.();
     },
 };
+
+// Viewport size, so popups like the process menu can stay on screen.
+window.sysPulseViewport = () => [window.innerWidth, window.innerHeight];

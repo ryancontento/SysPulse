@@ -5,11 +5,29 @@ network, and storage readings, plus a per-process breakdown.
 
 The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
 
+## Screenshots
+
+![The SysPulse dashboard: CPU and GPU dials with temperature, clock, power, and fan meters, memory, network, and storage cards with sparklines, and the process table](docs/screenshots/dashboard.png)
+
+| Flight Recorder | Why Slow? |
+|---|---|
+| ![The Flight Recorder: oscilloscope-style traces for CPU, GPU, memory, temperature, power, and network over the last five minutes](docs/screenshots/recorder.png) | ![The Why Slow? check reporting that nothing looks wrong](docs/screenshots/why-slow.png) |
+
+**Mini widget**, an always-on-top strip for a second screen:
+
+![The mini widget styled like a rack-mounted panel, showing CPU, GPU, RAM, and network readouts with throttle and alert lamps](docs/screenshots/widget.png)
+
+**Phone dashboard**, on the same Wi-Fi:
+
+<img src="docs/screenshots/phone.png" alt="The SysPulse phone dashboard showing CPU, GPU, memory, disk, and network readings with sparklines" width="300">
+
 ## Pages
 
 - **Dashboard:** CPU and GPU dials with temperature, clock, power, and fan meters, plus a badge when
   either one is thermal throttling or held at a power limit; memory, network, and storage cards with
-  two-minute sparklines; a sortable process table (CPU, GPU, RAM, download, upload).
+  two-minute sparklines; a sortable process table (CPU, GPU, RAM, download, upload). Right-click a
+  process to end it (with confirmation), open its file location, change its priority, or create a rule for it.
+  Core Windows processes are protected.
 - **Flight Recorder:** keeps the last hour of readings in memory (nothing is written to disk). Scrub
   across oscilloscope-style traces for CPU, GPU, memory, temperature, power, and network to see the busiest
   processes at any moment. Sustained spikes are logged as events with the processes most likely
@@ -17,7 +35,7 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
 - **Why Slow?:** reads the recent Flight Recorder history and explains in plain language what's most
   likely slowing the PC down: thermal throttling, a maxed-out CPU or one app hogging it, memory
   pressure, a disk stuck at 100%, or a power mode holding the CPU back. Some findings come with a
-  one-click fix.
+  one-click fix, like ending the app that's hogging the CPU.
 - **Alerts & Rules:** plain rules like *GPU temperature is above 85 °C for 30 s → notify me* or
   *the app Cyberpunk2077 is running → switch to Performance*. Profile switches change back when the
   trigger ends. Profiles (also in the title bar) set the Windows power mode: Silent is best power
@@ -35,6 +53,8 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
   from the tray menu or Settings.
 - **Phone:** a read-only phone dashboard over your home Wi-Fi (off by default). Turn it on, run the one-time
   setup (one UAC prompt), and scan the QR code. Phones pair with a random key; *New key* unpairs them all.
+  By default it only runs on trusted networks: the network you first use it on is trusted automatically, and
+  on any other network (a café, a hotel) it pauses by itself until you're back.
 - **Tray:** closing the window keeps SysPulse running in the tray (turn off in Settings), so rules and
   the Flight Recorder keep working. Right-click the tray icon to exit.
 
@@ -49,7 +69,21 @@ running as administrator; turning it off removes it. The Phone page's one-time s
 for its port and a Windows Firewall rule named `SysPulse phone dashboard` (private networks only); *Remove
 setup* deletes both.
 
-## Run
+## Download
+
+Grab the latest zip from the [Releases page](https://github.com/ryancontento/SysPulse/releases), unzip it
+anywhere (for example `C:\Tools\SysPulse`), and run `SysPulse.exe`.
+
+- **`SysPulse-<version>-win-x64-self-contained.zip`:** works on any 64-bit Windows 10 or 11. Pick this one if
+  you're not sure.
+- **`SysPulse-<version>-win-x64.zip`:** smaller, but needs the
+  [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) installed.
+
+SysPulse isn't code-signed, so the first launch shows a Windows SmartScreen warning. Choose **More info →
+Run anyway**. You'll also need the WebView2 runtime, which comes with Windows 11 and most up-to-date
+Windows 10 PCs.
+
+## Run from source
 
 ```powershell
 dotnet run --project src/SysPulse.App
@@ -63,7 +97,15 @@ Requires the .NET 10 SDK and the WebView2 runtime (included with Windows 11).
 dotnet publish src/SysPulse.App -c Release -r win-x64 --self-contained false
 ```
 
-Or use `tools\Publish.ps1`, which first asks a running SysPulse (including one hidden in the tray) to
+To make a GitHub release, bump `<Version>` in `src/SysPulse.App/SysPulse.App.csproj`, commit, then push a
+matching tag. The Release workflow builds both zips and attaches them:
+
+```powershell
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+For your own copy, use `tools\Publish.ps1`, which first asks a running SysPulse (including one hidden in the tray) to
 exit so its files aren't locked, and can copy the result somewhere with `-Destination C:\Tools\SysPulse`.
 
 Output goes to `src/SysPulse.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`. Copy that

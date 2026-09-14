@@ -1,0 +1,30 @@
+@if (Visible)
+{
+    <div class="overlay" @onclick="OnCancel">
+        <div class="dialog" role="alertdialog" aria-modal="true" @onclick:stopPropagation="true">
+            <h2 class="dialog-title">@Title</h2>
+            <p class="dialog-message">@Message</p>
+            <div class="dialog-actions">
+                <button type="button" class="button secondary" @onclick="OnCancel">Cancel</button>
+                <button type="button" class="button @(Danger ? "danger" : null)" @onclick="OnConfirm">@ConfirmText</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public string Title { get; set; } = "";
+
+    [Parameter] public string Message { get; set; } = "";
+
+    [Parameter] public string ConfirmText { get; set; } = "OK";
+
+    /// <summary>Styles the confirm button as destructive.</summary>
+    [Parameter] public bool Danger { get; set; }
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

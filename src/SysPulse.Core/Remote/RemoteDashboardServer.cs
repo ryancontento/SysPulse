@@ -28,6 +28,9 @@ public enum RemoteState
     /// <summary>Listening on this PC only, because the one-time setup hasn't been done.</summary>
     LocalOnly,
 
+    /// <summary>Turned on, but not listening because this isn't a trusted network.</summary>
+    Paused,
+
     Failed,
 }
 
@@ -52,6 +55,12 @@ public interface IRemoteDashboard
 
     /// <summary>Stops and starts the listener, e.g. after the one-time setup.</summary>
     void Restart();
+
+    /// <summary>Networks this PC is connected to, as of the last check.</summary>
+    IReadOnlyList<NetworkInfo> ConnectedNetworks { get; }
+
+    /// <summary>Identifies the connected networks again shortly, instead of waiting for the next periodic check.</summary>
+    void CheckNetworks();
 }
 
 /// <summary>
@@ -82,6 +91,12 @@ public sealed partial class RemoteDashboardServer(
         "img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     private static readonly TimeSpan LockoutWindow = TimeSpan.FromMinutes(10);
+
+    // Network changes raise an event, but check periodically too in case one is missed (e.g. after sleep).
+    private static readonly TimeSpan NetworkRecheck = TimeSpan.FromSeconds(30);
+
+    // After a change, give DHCP and the ARP cache a moment to settle before identifying the router.
+    private static readonly TimeSpan NetworkSettleDelay = TimeSpan.FromSeconds(3);
     private static readonly Lazy<byte[]> Page = new(LoadPage);
 
     private readonly Lock _lock = new();
@@ -95,6 +110,10 @@ public sealed partial class RemoteDashboardServer(
     private string? _latestSnapshot;
     private int _connectedPhones;
     private bool _disposed;
+
+    private readonly SemaphoreSlim _networkSignal = new(0);
+    private CancellationTokenSource? _monitorCancellation;
+    private IReadOnlyList<NetworkInfo> _networks = [];
     private long _lastSeenTicks;
 
     public RemoteState State { get; private set; }
@@ -110,10 +129,27 @@ public sealed partial class RemoteDashboardServer(
 
     public event Action? StatusChanged;
 
+    public IReadOnlyList<NetworkInfo> ConnectedNetworks
+    {
+        get
+        {
+            lock (_lock)
+                return _networks;
+        }
+    }
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         settings.Changed += OnSettingsChanged;
         metrics.Updated += OnMetricsUpdated;
+        NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+
+        // Identifying the router can take a moment, so it runs in the background. Until the first check finishes,
+        // a dashboard limited to trusted networks stays paused.
+        _monitorCancellation = new CancellationTokenSource();
+        var token = _monitorCancellation.Token;
+        _ = Task.Run(() => MonitorNetworksAsync(token), CancellationToken.None);
+
         Apply(settings.Current, force: false);
         return Task.CompletedTask;
     }
@@ -122,6 +158,8 @@ public sealed partial class RemoteDashboardServer(
     {
         settings.Changed -= OnSettingsChanged;
         metrics.Updated -= OnMetricsUpdated;
+        NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
+        _monitorCancellation?.Cancel();
 
         lock (_lock)
             StopListener();
@@ -130,6 +168,80 @@ public sealed partial class RemoteDashboardServer(
     }
 
     public void Restart() => Apply(settings.Current, force: true);
+
+    public void CheckNetworks()
+    {
+        try
+        {
+            _networkSignal.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Shutting down.
+        }
+    }
+
+    private void OnNetworkAddressChanged(object? sender, EventArgs e) => CheckNetworks();
+
+    private async Task MonitorNetworksAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                RefreshNetworks();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Couldn't identify the current network");
+            }
+
+            try
+            {
+                if (await _networkSignal.WaitAsync(NetworkRecheck, token))
+                {
+                    await Task.Delay(NetworkSettleDelay, token);
+
+                    // Several changes usually arrive together; one check covers them all.
+                    while (_networkSignal.Wait(0))
+                    {
+                    }
+                }
+            }
+            catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
+            {
+                return;
+            }
+        }
+    }
+
+    private void RefreshNetworks()
+    {
+        var networks = NetworkIdentity.Connected();
+
+        bool changed;
+        lock (_lock)
+        {
+            changed = !networks.Select(n => n.Id).SequenceEqual(_networks.Select(n => n.Id));
+            _networks = networks;
+        }
+
+        // Trust on first use: the network phone access is first used on is almost always home.
+        var current = settings.Current;
+        if (current is { RemoteEnabled: true, RemoteOnlyTrustedNetworks: true, RemoteTrustedNetworks.Count: 0 } && networks.Count > 0)
+        {
+            settings.Update(s => s with { RemoteTrustedNetworks = [.. s.RemoteTrustedNetworks, .. networks] });
+            return; // The settings change re-applies.
+        }
+
+        Apply(current, force: false);
+
+        if (changed)
+            StatusChanged?.Invoke();
+    }
+
+    private static bool IsTrusted(IReadOnlyList<NetworkInfo> trusted, IReadOnlyList<NetworkInfo> connected) =>
+        connected.Count > 0 && connected.All(network => trusted.Any(t => t.Id == network.Id));
 
     public IReadOnlyList<string> Addresses()
     {
@@ -142,7 +254,8 @@ public sealed partial class RemoteDashboardServer(
                 .Where(address => address.AddressFamily == AddressFamily.InterNetwork
                     && !IPAddress.IsLoopback(address)
                     && !address.ToString().StartsWith("169.254.", StringComparison.Ordinal))
-                .Select(address => $"http://{address}:{Port}/")
+                // The configured port, so the list is right even before the listener has started (or while paused).
+                .Select(address => $"http://{address}:{settings.Current.RemotePort}/")
                 .Distinct()
                 .ToList();
         }
@@ -152,12 +265,22 @@ public sealed partial class RemoteDashboardServer(
         }
     }
 
-    private void OnSettingsChanged(AppSettings updated) => Apply(updated, force: false);
+    private void OnSettingsChanged(AppSettings updated)
+    {
+        Apply(updated, force: false);
+
+        // Just turned on with no trusted networks yet: identify this one now rather than at the next periodic check.
+        if (updated is { RemoteEnabled: true, RemoteOnlyTrustedNetworks: true, RemoteTrustedNetworks.Count: 0 })
+            CheckNetworks();
+    }
 
     private void Apply(AppSettings current, bool force)
     {
         lock (_lock)
         {
+            if (_disposed)
+                return;
+
             // A new key disconnects every phone paired with the old one.
             if (current.RemoteKey != _streamKey)
             {
@@ -167,14 +290,21 @@ public sealed partial class RemoteDashboardServer(
                 _streamCancellation = new CancellationTokenSource();
             }
 
-            var wanted = current.RemoteEnabled ? current.RemotePort : (int?)null;
+            var trusted = !current.RemoteOnlyTrustedNetworks || IsTrusted(current.RemoteTrustedNetworks, _networks);
+            var wanted = current.RemoteEnabled && trusted ? current.RemotePort : (int?)null;
+            var idle = current.RemoteEnabled ? RemoteState.Paused : RemoteState.Off;
             var listening = State is RemoteState.Running or RemoteState.LocalOnly;
-            if (!force && ((wanted is null && State == RemoteState.Off) || (listening && wanted == Port)))
+
+            // Nothing to do: already idle in the right way, or already listening (or failed) on the wanted port.
+            // A failed port is only retried on Restart or a port change, not on every network check.
+            if (!force && ((wanted is null && State == idle) || (wanted == Port && (listening || State == RemoteState.Failed))))
                 return;
 
             StopListener();
             if (wanted is { } port)
                 StartListener(port);
+            else
+                State = idle;
         }
 
         StatusChanged?.Invoke();
@@ -542,8 +672,12 @@ public sealed partial class RemoteDashboardServer(
                 return;
 
             _disposed = true;
+            NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
+            _monitorCancellation?.Cancel();
+            _monitorCancellation?.Dispose();
             StopListener();
             _streamCancellation.Dispose();
+            _networkSignal.Dispose();
         }
     }
 }

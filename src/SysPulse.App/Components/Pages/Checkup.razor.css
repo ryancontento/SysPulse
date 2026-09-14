@@ -105,8 +105,19 @@ p {
     margin-top: 10px;
 }
 
-.error-text {
-    color: var(--danger);
+.action-message {
+    padding: 8px 12px;
+    color: var(--text);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+}
+
+.action-message.failed {
+    background: rgba(229, 88, 74, 0.08);
+    border-color: rgba(229, 88, 74, 0.35);
+    border-left-color: var(--danger);
 }
 
 .footnote {

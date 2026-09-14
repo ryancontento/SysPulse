@@ -4,6 +4,7 @@
 @inject IPowerProfileService Power
 @inject ISettingsService SettingsService
 @inject NavigationManager Navigation
+@inject IProcessActions ProcessActions
 
 <div class="checkup">
     <header class="page-header">
@@ -53,13 +54,19 @@
                             <button type="button" class="button secondary" @onclick="@(() => Navigation.NavigateTo("recorder"))">Open Flight Recorder</button>
                         </div>
                     }
+                    else if (finding is { Action: FindingAction.EndProcess, ProcessName: { } processName } && !ProcessActions.IsProtected(processName))
+                    {
+                        <div class="finding-actions">
+                            <button type="button" class="button secondary" @onclick="() => _confirmEnd = processName">End @processName…</button>
+                        </div>
+                    }
                 </div>
             </section>
         }
 
-        @if (_actionError is not null)
+        @if (_actionMessage is not null)
         {
-            <p class="error-text">Couldn't switch profiles: @_actionError</p>
+            <p class="action-message @(_actionFailed ? "failed" : null)">@_actionMessage</p>
         }
 
         <p class="footnote">
@@ -69,12 +76,22 @@
     }
 </div>
 
+<ConfirmDialog Visible="_confirmEnd is not null"
+               Title="@($"End {_confirmEnd}?")"
+               Message="@($"This closes every {_confirmEnd} process. Anything unsaved in it will be lost.")"
+               ConfirmText="End process"
+               Danger="true"
+               OnConfirm="EndConfirmedAsync"
+               OnCancel="() => _confirmEnd = null" />
+
 @code {
     private static readonly SegmentOption<int>[] WindowOptions = [new(2, "2 min"), new(5, "5 min"), new(15, "15 min")];
 
     private int _minutes = 5;
     private SlowdownReport? _report;
-    private string? _actionError;
+    private string? _actionMessage;
+    private bool _actionFailed;
+    private string? _confirmEnd;
 
     private FindingSeverity? Worst =>
         _report is not { HasEnoughData: true } report ? null
@@ -88,9 +105,22 @@
         Run();
     }
 
+    private async Task EndConfirmedAsync()
+    {
+        if (_confirmEnd is not { } name)
+            return;
+
+        _confirmEnd = null;
+        var result = await Task.Run(() => ProcessActions.End(name, null));
+
+        // History still includes the time before it was ended, so don't re-run the check right away.
+        _actionMessage = result.Success ? result.Message + " Check again in a minute or two to see the difference." : result.Message;
+        _actionFailed = !result.Success;
+    }
+
     private void Run()
     {
-        _actionError = null;
+        _actionMessage = null;
         _report = SlowdownAnalyzer.Analyze(
             Recorder.GetSamples(TimeSpan.FromMinutes(_minutes)),
             MetricsSource.Current,
@@ -120,7 +150,8 @@
         }
         catch (Exception ex)
         {
-            _actionError = ex.Message;
+            _actionMessage = $"Couldn't switch profiles: {ex.Message}";
+            _actionFailed = true;
         }
     }
 

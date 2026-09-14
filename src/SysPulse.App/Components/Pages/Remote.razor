@@ -31,6 +31,60 @@
         }
     </section>
 
+    @if (_settings.RemoteEnabled)
+    {
+        <section class="card">
+            <h2 class="card-title">Networks</h2>
+
+            <div class="setting">
+                <div class="setting-text">
+                    <div class="setting-name">Only on trusted networks</div>
+                    <div class="setting-hint">Phone access pauses by itself on any other network, like a café or hotel, and picks up again when you're back.</div>
+                </div>
+                <ToggleSwitch Value="_settings.RemoteOnlyTrustedNetworks"
+                              ValueChanged="@((bool on) => SettingsService.Update(s => s with { RemoteOnlyTrustedNetworks = on }))" />
+            </div>
+
+            @if (_settings.RemoteOnlyTrustedNetworks)
+            {
+                <div class="networks">
+                    @foreach (var network in Dashboard.ConnectedNetworks)
+                    {
+                        var trusted = IsTrusted(network);
+                        <div class="network" @key="network.Id">
+                            <span class="network-lamp @(trusted ? "on" : null)"></span>
+                            <span class="network-name" title="@network.Name">@network.Name</span>
+                            <span class="network-tag">@(trusted ? "Connected · trusted" : "Connected · not trusted")</span>
+                            @if (trusted)
+                            {
+                                <button type="button" class="button secondary" @onclick="() => Forget(network)">Forget</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="button" @onclick="() => Trust(network)">Trust</button>
+                            }
+                        </div>
+                    }
+
+                    @foreach (var network in _settings.RemoteTrustedNetworks.Where(t => Dashboard.ConnectedNetworks.All(c => c.Id != t.Id)))
+                    {
+                        <div class="network" @key="network.Id">
+                            <span class="network-lamp"></span>
+                            <span class="network-name" title="@network.Name">@network.Name</span>
+                            <span class="network-tag">Trusted</span>
+                            <button type="button" class="button secondary" @onclick="() => Forget(network)">Forget</button>
+                        </div>
+                    }
+
+                    @if (Dashboard.ConnectedNetworks.Count == 0 && _settings.RemoteTrustedNetworks.Count == 0)
+                    {
+                        <p class="hint">Looking for your network…</p>
+                    }
+                </div>
+            }
+        </section>
+    }
+
     @if (_settings.RemoteEnabled && NeedsSetup)
     {
         <section class="card">
@@ -152,12 +206,16 @@
         RemoteState.Running => $"Listening on port {Dashboard.Port} · {Phones(Dashboard.ConnectedPhones)} connected" +
                                (Dashboard.LastSeen is { } seen ? $" · last seen {seen.ToString("t", CultureInfo.CurrentCulture)}" : ""),
         RemoteState.LocalOnly => "Only this PC can connect until the one-time setup is done.",
+        RemoteState.Paused => Dashboard.ConnectedNetworks.Count == 0
+            ? "Paused while SysPulse identifies this network."
+            : "Paused: this network isn't trusted, so phones can't connect here. It resumes on a trusted network.",
         RemoteState.Failed => Dashboard.Error ?? "Couldn't start the phone dashboard.",
         _ => "Starting…",
     };
 
     protected override void OnInitialized()
     {
+        Dashboard.CheckNetworks();
         Refresh(checkFirewall: true);
         Dashboard.StatusChanged += OnStatusChanged;
         SettingsService.Changed += OnSettingsChanged;
@@ -266,6 +324,14 @@
         _setupMessage = approved ? "Setup removed." : "Removal was cancelled.";
         _busy = false;
     }
+
+    private bool IsTrusted(NetworkInfo network) => _settings.RemoteTrustedNetworks.Any(t => t.Id == network.Id);
+
+    private void Trust(NetworkInfo network) =>
+        SettingsService.Update(s => s with { RemoteTrustedNetworks = [.. s.RemoteTrustedNetworks, network] });
+
+    private void Forget(NetworkInfo network) =>
+        SettingsService.Update(s => s with { RemoteTrustedNetworks = s.RemoteTrustedNetworks.Where(t => t.Id != network.Id).ToArray() });
 
     private static string Phones(int count) => count == 1 ? "1 phone" : $"{count} phones";
 

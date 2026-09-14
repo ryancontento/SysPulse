@@ -1,3 +1,4 @@
+using SysPulse.Core.Remote;
 using SysPulse.Core.Rules;
 
 namespace SysPulse.Core.Settings;
@@ -47,6 +48,13 @@ public sealed record AppSettings
     /// <summary>Pairing key phones must present. Empty until phone access is first turned on.</summary>
     public string RemoteKey { get; init; } = "";
 
+    /// <summary>Pauses the phone dashboard on any network not in <see cref="RemoteTrustedNetworks"/>.</summary>
+    public bool RemoteOnlyTrustedNetworks { get; init; } = true;
+
+    public IReadOnlyList<NetworkInfo> RemoteTrustedNetworks { get; init; } = [];
+
+    public const int MaxTrustedNetworks = 20;
+
     public const int DefaultRemotePort = 8787;
 
     public IReadOnlyList<AlertRule> Rules { get; init; } = AlertRule.Defaults;
@@ -62,6 +70,11 @@ public sealed record AppSettings
         WidgetTop = WidgetTop is { } top && double.IsFinite(top) ? top : null,
         RemotePort = RemotePort is >= 1024 and <= 65535 ? RemotePort : DefaultRemotePort,
         RemoteKey = RemoteKey ?? "",
+        RemoteTrustedNetworks = (RemoteTrustedNetworks ?? [])
+            .Where(n => n is not null && !string.IsNullOrWhiteSpace(n.Id))
+            .DistinctBy(n => n.Id)
+            .Take(MaxTrustedNetworks)
+            .ToArray(),
         Rules = (Rules ?? []).Where(r => r is not null).Select(r => r.Normalize()).Take(MaxRules).ToArray(),
     };
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SysPulse.Core.Audio;
 using SysPulse.Core.Power;
+using SysPulse.Core.Processes;
 using SysPulse.Core.Recording;
 using SysPulse.Core.Remote;
 using SysPulse.Core.Rules;
@@ -22,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAudioService, CoreAudioService>();
         services.AddSingleton<IPowerProfileService, WindowsPowerProfileService>();
         services.AddSingleton<IStartupService, WindowsStartupService>();
+        services.AddSingleton<IProcessActions, ProcessActions>();
         services.TryAddSingleton<INotifier, NullNotifier>();
 
         services.AddSingleton<MetricsService>();
