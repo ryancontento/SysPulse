@@ -1,0 +1,30 @@
+<div class="metric">
+    <div class="row">
+        <span class="label">@Label</span>
+        @if (Value is { } value)
+        {
+            <span class="value readout">@value.ToString("0", CultureInfo.CurrentCulture)<span class="unit">@Unit</span></span>
+        }
+        else
+        {
+            <span class="value readout unavailable">N/A</span>
+        }
+    </div>
+    <div class="meter"><div class="fill" style="width:@FillWidth"></div></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Null renders as "N/A" with an empty meter.</summary>
+    [Parameter] public double? Value { get; set; }
+
+    [Parameter] public string Unit { get; set; } = "";
+
+    /// <summary>The value that fills the meter completely.</summary>
+    [Parameter] public double Max { get; set; } = 100;
+
+    private string FillWidth => Value is { } value && Max > 0
+        ? FormattableString.Invariant($"{Math.Clamp(value / Max, 0, 1) * 100:0.#}%")
+        : "0%";
+}

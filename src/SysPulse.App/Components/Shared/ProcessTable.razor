@@ -1,0 +1,134 @@
+<section class="card processes">
+    <div class="scroll">
+        <table>
+            <colgroup>
+                <col class="name-col" />
+                @for (var i = 1; i < Columns.Length; i++)
+                {
+                    <col />
+                }
+            </colgroup>
+            <thead>
+                <tr>
+                    @foreach (var column in Columns)
+                    {
+                        <th class="@column.CssClass @(column.Key == _sortColumn ? "sorted" : null)" title="@HeaderTitle(column)" @onclick="() => SortBy(column.Key)">
+                            @column.Title
+                            @if (column.Key == _sortColumn)
+                            {
+                                <svg class="chevron @(_descending ? null : "ascending")" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5" /></svg>
+                            }
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var process in SortedRows())
+                {
+                    var (ramValue, ramUnit) = Units.Size(process.MemoryBytes, minUnit: 2);
+                    <tr @key="process.Name">
+                        <td class="name" title="@(process.InstanceCount > 1 ? $"{process.InstanceCount} processes" : null)">
+                            @process.Name
+                            @if (process.InstanceCount > 1)
+                            {
+                                <span class="count">@process.InstanceCount</span>
+                            }
+                        </td>
+                        <td class="num @HotClass(process.CpuPercent)">@WholeNumber(process.CpuPercent)<span class="unit">%</span></td>
+                        <td class="num @HotClass(process.GpuPercent)">@WholeNumber(process.GpuPercent)<span class="unit">%</span></td>
+                        <td class="num">@ramValue<span class="unit">@ramUnit</span></td>
+                        @foreach (var rate in new[] { process.DownloadBytesPerSec, process.UploadBytesPerSec })
+                        {
+                            if (NetworkAvailable)
+                            {
+                                var (rateValue, rateUnit) = Units.Size(rate);
+                                <td class="num">@rateValue<span class="unit">@rateUnit/s</span></td>
+                            }
+                            else
+                            {
+                                <td class="num unavailable">–</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private const int MaxRows = 50;
+    private const double HotPercent = 25;
+
+    private static readonly Column[] Columns =
+    [
+        new(SortColumn.Name, "Process", "name"),
+        new(SortColumn.Cpu, "CPU", "num"),
+        new(SortColumn.Gpu, "GPU", "num"),
+        new(SortColumn.Ram, "RAM", "num"),
+        new(SortColumn.Download, "Down", "num"),
+        new(SortColumn.Upload, "Up", "num"),
+    ];
+
+    private SortColumn _sortColumn = SortColumn.Cpu;
+    private bool _descending = true;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ProcessMetrics> Processes { get; set; } = [];
+
+    /// <summary>Per-process network usage needs elevation; without it those columns show a dash.</summary>
+    [Parameter] public bool NetworkAvailable { get; set; }
+
+    private void SortBy(SortColumn column)
+    {
+        if (column == _sortColumn)
+        {
+            _descending = !_descending;
+            return;
+        }
+
+        _sortColumn = column;
+        _descending = column != SortColumn.Name; // Numbers default to biggest first, names to A–Z.
+    }
+
+    private IEnumerable<ProcessMetrics> SortedRows()
+    {
+        IOrderedEnumerable<ProcessMetrics> ordered;
+        if (_sortColumn == SortColumn.Name)
+        {
+            ordered = _descending
+                ? Processes.OrderByDescending(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                : Processes.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            var key = KeySelector(_sortColumn);
+            ordered = _descending ? Processes.OrderByDescending(key) : Processes.OrderBy(key);
+        }
+
+        // Break ties (lots of processes sit at 0%) by memory so rows don't jump around between samples.
+        return ordered.ThenByDescending(p => p.MemoryBytes).Take(MaxRows);
+    }
+
+    private static Func<ProcessMetrics, double> KeySelector(SortColumn column) => column switch
+    {
+        SortColumn.Cpu => p => p.CpuPercent,
+        SortColumn.Gpu => p => p.GpuPercent,
+        SortColumn.Ram => p => p.MemoryBytes,
+        SortColumn.Download => p => p.DownloadBytesPerSec,
+        SortColumn.Upload => p => p.UploadBytesPerSec,
+        _ => throw new ArgumentOutOfRangeException(nameof(column)),
+    };
+
+    private string? HeaderTitle(Column column) =>
+        column.Key is SortColumn.Download or SortColumn.Upload && !NetworkAvailable
+            ? "Run as administrator to see per-process network usage"
+            : null;
+
+    private static string? HotClass(double percent) => percent >= HotPercent ? "hot" : null;
+
+    private static string WholeNumber(double value) => Math.Round(value).ToString("0", CultureInfo.CurrentCulture);
+
+    private enum SortColumn { Name, Cpu, Gpu, Ram, Download, Upload }
+
+    private sealed record Column(SortColumn Key, string Title, string CssClass);
+}

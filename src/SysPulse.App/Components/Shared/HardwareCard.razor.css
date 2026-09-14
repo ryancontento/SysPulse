@@ -1,0 +1,20 @@
+.hardware-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.body {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 2px 4px 0;
+}
+
+.bars {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}

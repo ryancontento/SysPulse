@@ -1,0 +1,39 @@
+.row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.label {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.value {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.unavailable {
+    color: var(--text-faint);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+}
+
+/* Segmented LED-ladder meter: the mask cuts both the track and the fill into cells. */
+.meter {
+    height: 8px;
+    background: var(--track);
+    -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+    mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+}
+
+.fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c7822a, var(--accent));
+    transition: width 0.6s ease;
+}

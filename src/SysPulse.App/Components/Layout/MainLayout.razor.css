@@ -1,0 +1,90 @@
+.shell {
+    display: grid;
+    grid-template-columns: 188px 1fr;
+    height: 100vh;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px 10px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+}
+
+.nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* NavLink renders its own <a>, which doesn't carry this component's scope attribute. */
+.sidebar ::deep .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    color: var(--text-faint);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.sidebar ::deep .nav-item:hover {
+    color: var(--text-muted);
+    background: var(--bg-hover);
+}
+
+.sidebar ::deep .nav-item.active {
+    color: var(--text);
+    background: linear-gradient(90deg, var(--accent-soft), transparent 85%);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.sidebar svg {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sidebar ::deep .nav-item.active svg {
+    stroke: var(--accent);
+}
+
+.page-error p {
+    margin: 10px 0 14px;
+    color: var(--text-muted);
+}
+
+.page-error button {
+    padding: 6px 14px;
+    color: var(--bg-app);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--accent);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.content {
+    min-width: 0;
+    height: 100vh;
+    padding: 16px;
+    overflow: auto;
+    /* Faint dot grid, like engineering paper. */
+    background-color: var(--bg-app);
+    background-image: radial-gradient(rgba(236, 229, 213, 0.045) 1px, transparent 1.2px);
+    background-size: 20px 20px;
+}

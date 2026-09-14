@@ -1,0 +1,47 @@
+@inherits LayoutComponentBase
+
+<div class="shell">
+    <nav class="sidebar">
+        <div class="nav-group">
+            <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+                <svg viewBox="0 0 24 24"><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 6-7" /></svg>
+                <span>Dashboard</span>
+            </NavLink>
+            <NavLink class="nav-item" href="specs">
+                <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                <span>System Specs</span>
+            </NavLink>
+            <NavLink class="nav-item" href="audio">
+                <svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3" /><rect x="2" y="14" width="4" height="7" rx="1.5" /><rect x="18" y="14" width="4" height="7" rx="1.5" /></svg>
+                <span>Audio</span>
+            </NavLink>
+        </div>
+
+        <NavLink class="nav-item" href="settings">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+            <span>Settings</span>
+        </NavLink>
+    </nav>
+
+    <main class="content">
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent Context="exception">
+                <section class="card page-error">
+                    <h2 class="card-title">Something went wrong</h2>
+                    <p>@exception.Message</p>
+                    <button type="button" @onclick="() => _errorBoundary?.Recover()">Try again</button>
+                </section>
+            </ErrorContent>
+        </ErrorBoundary>
+    </main>
+</div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+
+    // Navigating to another page clears a previous page's error.
+    protected override void OnParametersSet() => _errorBoundary?.Recover();
+}

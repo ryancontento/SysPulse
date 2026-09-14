@@ -1,0 +1,75 @@
+.gauge {
+    --dial: var(--accent);
+    --dial-glow: var(--accent-glow);
+
+    position: relative;
+    flex-shrink: 0;
+    width: var(--gauge-size);
+    height: var(--gauge-size);
+}
+
+.gauge.critical {
+    --dial: var(--danger);
+    --dial-glow: rgba(229, 88, 74, 0.45);
+}
+
+svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+circle {
+    fill: none;
+    stroke-width: 6;
+}
+
+.track {
+    stroke: var(--track);
+}
+
+.fill {
+    stroke: var(--dial);
+    filter: drop-shadow(0 0 3px var(--dial-glow));
+    transition: stroke-dasharray 0.6s ease, stroke 0.3s ease;
+}
+
+.tick {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    transition: stroke 0.3s ease;
+}
+
+.tick.major {
+    stroke: var(--text-faint);
+    stroke-width: 1.6;
+}
+
+.tick.lit {
+    stroke: var(--dial);
+}
+
+.readout-stack {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.value {
+    font-size: calc(var(--gauge-size) * 0.2);
+    font-weight: 500;
+    line-height: 1;
+}
+
+.label {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: max(10px, calc(var(--gauge-size) * 0.07));
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}

@@ -1,0 +1,175 @@
+/* IBM Plex, bundled locally (SIL Open Font License, see fonts/OFL.txt). */
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: block; src: url("../fonts/ibm-plex-sans-400.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: block; src: url("../fonts/ibm-plex-sans-500.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: block; src: url("../fonts/ibm-plex-sans-600.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: block; src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: block; src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; font-display: block; src: url("../fonts/ibm-plex-mono-600.woff2") format("woff2"); }
+
+:root {
+    color-scheme: dark;
+
+    /* Warm charcoal surfaces */
+    --bg-app: #13120f;
+    --bg-sidebar: #0e0d0b;
+    --bg-card: #1a1915;
+    --bg-raised: #211f1a;
+    --bg-hover: #27251f;
+    --border: #2e2b25;
+    --border-strong: #3b372f;
+
+    /* Paper-white text */
+    --text: #ece5d5;
+    --text-muted: #a39a88;
+    --text-faint: #6b6457;
+
+    /* Amber phosphor accent */
+    --accent: #f0a33a;
+    --accent-soft: rgba(240, 163, 58, 0.12);
+    --accent-glow: rgba(240, 163, 58, 0.4);
+    --track: #2a2721;
+
+    /* Status lamps */
+    --ok: #9cc084;
+    --warn: #f0a33a;
+    --hot: #ec7a3a;
+    --danger: #e5584a;
+
+    --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+    --radius: 6px;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body {
+    background: var(--bg-app);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    cursor: default;
+    user-select: none;
+}
+
+#app {
+    height: 100%;
+}
+
+.app-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* Panels */
+
+.card {
+    position: relative;
+    min-width: 0;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, var(--bg-raised), var(--bg-card) 72px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.card-title {
+    flex-shrink: 0;
+    margin: 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.card-detail {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-footer {
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+/* Numeric readouts */
+
+.readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.unit {
+    margin-left: 2px;
+    color: var(--text-muted);
+    font-size: 0.62em;
+    letter-spacing: 0.02em;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 5px;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    padding: 10px 16px;
+    background: #5a2620;
+    color: var(--text);
+}
+
+#blazor-error-ui .reload {
+    margin-left: 8px;
+    color: var(--text);
+}
+
+#blazor-error-ui .dismiss {
+    float: right;
+    cursor: pointer;
+}

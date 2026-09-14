@@ -1,0 +1,17 @@
+<Application x:Class="SysPulse.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ThemeMode="Dark">
+    <Application.Resources>
+        <!-- Keep in sync with the tokens in wwwroot/css/app.css. -->
+        <SolidColorBrush x:Key="TitleBarBrush" Color="#0E0D0B" />
+        <SolidColorBrush x:Key="TitleBarTextBrush" Color="#ECE5D5" />
+        <SolidColorBrush x:Key="TitleBarMutedBrush" Color="#A39A88" />
+        <SolidColorBrush x:Key="CaptionHoverBrush" Color="#27251F" />
+        <SolidColorBrush x:Key="DividerBrush" Color="#2E2B25" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#F0A33A" />
+        <Color x:Key="AccentColor">#F0A33A</Color>
+
+        <FontFamily x:Key="PlexMono">pack://application:,,,/Fonts/#IBM Plex Mono</FontFamily>
+    </Application.Resources>
+</Application>

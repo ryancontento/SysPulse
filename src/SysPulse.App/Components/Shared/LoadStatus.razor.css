@@ -1,0 +1,37 @@
+.load-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* A small indicator lamp with a soft glow. */
+.lamp {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lamp);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 8px var(--lamp);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.minimal {
+    --lamp: var(--ok);
+}
+
+.moderate {
+    --lamp: var(--warn);
+}
+
+.high {
+    --lamp: var(--hot);
+}
+
+.heavy {
+    --lamp: var(--danger);
+    color: var(--danger);
+}

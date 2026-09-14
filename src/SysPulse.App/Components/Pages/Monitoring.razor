@@ -1,0 +1,102 @@
+@page "/"
+@implements IDisposable
+@inject IMetricsSource MetricsSource
+
+<div class="dashboard">
+    @if (Notice is { } notice)
+    {
+        <div class="notice">@notice</div>
+    }
+
+    <div class="row hardware">
+        <HardwareCard Title="CPU" Metrics="_snapshot.Cpu" ClockFloorMhz="5000" FanFloorRpm="2500" />
+        <HardwareCard Title="GPU" Metrics="_snapshot.Gpu" ClockFloorMhz="2500" FanFloorRpm="3000" />
+    </div>
+
+    <div class="row system">
+        <section class="card system-card">
+            <header class="card-header">
+                <h2 class="card-title">Memory</h2>
+                <span class="card-detail">@Units.UsedOfTotal(_snapshot.Memory.UsedBytes, _snapshot.Memory.TotalBytes)</span>
+            </header>
+            <div class="center">
+                <Gauge Value="_snapshot.Memory.LoadPercent" Size="112" />
+            </div>
+            <footer class="card-footer">
+                <LoadStatus Percent="_snapshot.Memory.LoadPercent" />
+            </footer>
+        </section>
+
+        <section class="card system-card">
+            <header class="card-header">
+                <h2 class="card-title">Network</h2>
+            </header>
+            @{
+                var (upValue, upUnit) = Units.Size(_snapshot.Network.UploadBytesPerSec, minUnit: 1);
+                var (downValue, downUnit) = Units.Size(_snapshot.Network.DownloadBytesPerSec, minUnit: 1);
+            }
+            <div class="rates">
+                <div class="rate">
+                    <span class="direction"><svg viewBox="0 0 10 10"><path d="M5 1.5 9 8.5H1z" /></svg>Up</span>
+                    <span class="readout">@upValue<span class="unit">@upUnit/s</span></span>
+                </div>
+                <div class="rate">
+                    <span class="direction"><svg viewBox="0 0 10 10"><path d="M5 8.5 1 1.5h8z" /></svg>Down</span>
+                    <span class="readout">@downValue<span class="unit">@downUnit/s</span></span>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <LoadStatus Percent="NetworkLoadPercent" />
+            </footer>
+        </section>
+
+        <section class="card system-card">
+            <header class="card-header">
+                <h2 class="card-title">Storage</h2>
+                <span class="card-detail">@Units.UsedOfTotal(_snapshot.Storage.UsedBytes, _snapshot.Storage.TotalBytes)</span>
+            </header>
+            <div class="center">
+                <Gauge Value="_snapshot.Storage.LoadPercent" Size="112" Label="Used" />
+            </div>
+            @{
+                var (freeValue, freeUnit) = Units.Size(_snapshot.Storage.TotalBytes - _snapshot.Storage.UsedBytes, minUnit: 3);
+            }
+            <footer class="card-footer footer-text">
+                Free<span class="readout">@freeValue<span class="unit">@freeUnit</span></span>
+            </footer>
+        </section>
+    </div>
+
+    <ProcessTable Processes="_snapshot.Processes" NetworkAvailable="_snapshot.Status.ProcessNetworkAvailable" />
+</div>
+
+@code {
+    // The network card's load status treats a 100 Mbps link as "full".
+    private const double NetworkReferenceBytesPerSec = 100_000_000 / 8.0;
+
+    private SystemSnapshot _snapshot = SystemSnapshot.Empty;
+
+    private double NetworkLoadPercent =>
+        (_snapshot.Network.DownloadBytesPerSec + _snapshot.Network.UploadBytesPerSec) / NetworkReferenceBytesPerSec * 100;
+
+    private string? Notice =>
+        !_snapshot.HasData ? null
+        : !_snapshot.Status.IsElevated ? "Running without administrator rights, so CPU temperature, fan speeds, and per-process network usage aren't available."
+        : !_snapshot.Status.HardwareSensorsAvailable ? "CPU sensors aren't available. LibreHardwareMonitor needs the PawnIO driver (pawnio.eu) to read them."
+        : null;
+
+    protected override void OnInitialized()
+    {
+        _snapshot = MetricsSource.Current;
+        MetricsSource.Updated += OnMetricsUpdated;
+    }
+
+    private void OnMetricsUpdated(SystemSnapshot snapshot) =>
+        _ = InvokeAsync(() =>
+        {
+            _snapshot = snapshot;
+            StateHasChanged();
+        });
+
+    public void Dispose() => MetricsSource.Updated -= OnMetricsUpdated;
+}

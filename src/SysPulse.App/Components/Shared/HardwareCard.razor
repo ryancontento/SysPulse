@@ -1,0 +1,39 @@
+<section class="card hardware-card">
+    <header class="card-header">
+        <h2 class="card-title">@Title</h2>
+        <span class="card-detail" title="@Metrics.Name">@Metrics.Name</span>
+    </header>
+
+    <div class="body">
+        <Gauge Value="Metrics.LoadPercent" Size="148" />
+        <div class="bars">
+            <MetricBar Label="Temperature" Value="Metrics.TemperatureC" Unit="°C" Max="100" />
+            <MetricBar Label="Clock" Value="Metrics.ClockMhz" Unit="MHz" Max="_clockMax" />
+            <MetricBar Label="Fan" Value="Metrics.FanRpm" Unit="RPM" Max="_fanMax" />
+        </div>
+    </div>
+
+    <footer class="card-footer">
+        <LoadStatus Percent="Metrics.LoadPercent" />
+    </footer>
+</section>
+
+@code {
+    private double _clockMax;
+    private double _fanMax;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter, EditorRequired] public DeviceMetrics Metrics { get; set; } = DeviceMetrics.Empty;
+
+    // Clock and fan meters scale against the highest value seen this session, but never below these floors.
+    [Parameter] public double ClockFloorMhz { get; set; } = 5000;
+
+    [Parameter] public double FanFloorRpm { get; set; } = 2500;
+
+    protected override void OnParametersSet()
+    {
+        _clockMax = Math.Max(Math.Max(_clockMax, ClockFloorMhz), Metrics.ClockMhz ?? 0);
+        _fanMax = Math.Max(Math.Max(_fanMax, FanFloorRpm), Metrics.FanRpm ?? 0);
+    }
+}

@@ -1,0 +1,56 @@
+@* A 270° instrument dial: scale ticks outside the arc, readout in the middle, gap in the bottom-right quadrant. *@
+<div class="gauge @(Value >= CriticalPercent ? "critical" : null)" style="--gauge-size:@(Size)px">
+    <svg viewBox="0 0 100 100">
+        @foreach (var tick in Ticks)
+        {
+            <line class="tick @(tick.Major ? "major" : null) @(Value > 0 && tick.Percent <= Value ? "lit" : null)"
+                  x1="@tick.X1" y1="@tick.Y1" x2="@tick.X2" y2="@tick.Y2" />
+        }
+        <circle class="track" cx="50" cy="50" r="@RadiusText" transform="rotate(@StartDegrees 50 50)" style="stroke-dasharray:@Dash(1)" />
+        <circle class="fill" cx="50" cy="50" r="@RadiusText" transform="rotate(@StartDegrees 50 50)" style="stroke-dasharray:@Dash(Value / 100)" />
+    </svg>
+    <div class="readout-stack">
+        <div class="value readout">@Math.Round(Value).ToString("0", CultureInfo.CurrentCulture)<span class="unit">%</span></div>
+        <div class="label">@Label</div>
+    </div>
+</div>
+
+@code {
+    private const double Radius = 36;
+    private const int StartDegrees = 90;
+    private const double SweepDegrees = 270;
+    private const int TickCount = 20;         // One tick per 5%...
+    private const int MajorTickEvery = 4;     // ...with a major tick every 20%.
+    private const double CriticalPercent = 85;
+
+    private static readonly double Circumference = 2 * Math.PI * Radius;
+    private static readonly string RadiusText = Radius.ToString(CultureInfo.InvariantCulture);
+    private static readonly Tick[] Ticks = Enumerable.Range(0, TickCount + 1).Select(CreateTick).ToArray();
+
+    /// <summary>0–100.</summary>
+    [Parameter] public double Value { get; set; }
+
+    [Parameter] public string Label { get; set; } = "Load";
+
+    /// <summary>Width and height in pixels.</summary>
+    [Parameter] public int Size { get; set; } = 130;
+
+    private static string Dash(double fraction) =>
+        FormattableString.Invariant($"{Circumference * SweepDegrees / 360 * Math.Clamp(fraction, 0, 1):0.##} {Circumference:0.##}");
+
+    private static Tick CreateTick(int index)
+    {
+        var fraction = (double)index / TickCount;
+        var major = index % MajorTickEvery == 0;
+        var angle = (StartDegrees + fraction * SweepDegrees) * Math.PI / 180;
+        var (cos, sin) = (Math.Cos(angle), Math.Sin(angle));
+        var inner = major ? 41.5 : 43.5;
+        const double outer = 47;
+
+        return new Tick(fraction * 100, major, Coord(50 + inner * cos), Coord(50 + inner * sin), Coord(50 + outer * cos), Coord(50 + outer * sin));
+    }
+
+    private static string Coord(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private readonly record struct Tick(double Percent, bool Major, string X1, string Y1, string X2, string Y2);
+}

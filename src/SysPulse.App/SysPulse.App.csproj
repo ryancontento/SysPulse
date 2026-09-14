@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- BlazorWebView's WebView2 composition control needs the Windows SDK projection, so pin an SDK version. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>SysPulse.App</RootNamespace>
+    <AssemblyName>SysPulse</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Regenerate with tools/New-AppIcon.ps1. -->
+    <ApplicationIcon>Assets\SysPulse.ico</ApplicationIcon>
+    <!-- Application.ThemeMode (the Fluent dark theme used by the title bar ComboBox) is still marked experimental. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SysPulse.Core\SysPulse.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IBM Plex Mono for the WPF title bar; the web UI loads its own copies from wwwroot/fonts. -->
+    <Resource Include="Fonts\*.ttf" />
+    <Resource Include="Assets\SysPulse.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.101" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>

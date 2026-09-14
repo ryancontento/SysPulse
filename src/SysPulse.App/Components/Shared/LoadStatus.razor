@@ -1,0 +1,18 @@
+@{
+    var (text, cssClass) = Level;
+}
+<div class="load-status @cssClass"><span class="lamp"></span>@text</div>
+
+@code {
+    /// <summary>0–100.</summary>
+    [Parameter] public double Percent { get; set; }
+
+    // Patterns use >= because Razor reads "< 25" in a code block as the start of an HTML tag.
+    private (string Text, string CssClass) Level => Percent switch
+    {
+        >= 80 => ("Heavy Load", "heavy"),
+        >= 50 => ("High Load", "high"),
+        >= 25 => ("Moderate Load", "moderate"),
+        _ => ("Minimal Load", "minimal"),
+    };
+}
