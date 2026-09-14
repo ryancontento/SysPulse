@@ -18,6 +18,7 @@ own license.
 | Microsoft.AspNetCore.Components.WebView.Wpf | MIT | https://www.nuget.org/packages/Microsoft.AspNetCore.Components.WebView.Wpf |
 | Microsoft.Extensions.Hosting | MIT | https://www.nuget.org/packages/Microsoft.Extensions.Hosting |
 | System.Diagnostics.PerformanceCounter | MIT | https://www.nuget.org/packages/System.Diagnostics.PerformanceCounter |
+| QRCoder | MIT | https://www.nuget.org/packages/QRCoder |
 
 The source code for the MPL-2.0 components is available from the package pages above
 (MPL-2.0 §3.2). Full license texts are included in each package.

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SysPulse.Core.Audio;
 using SysPulse.Core.Power;
 using SysPulse.Core.Recording;
+using SysPulse.Core.Remote;
 using SysPulse.Core.Rules;
 using SysPulse.Core.Services;
 using SysPulse.Core.Settings;
@@ -34,6 +35,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RuleEngine>();
         services.AddSingleton<IRuleEngine>(sp => sp.GetRequiredService<RuleEngine>());
         services.AddHostedService(sp => sp.GetRequiredService<RuleEngine>());
+
+        services.AddSingleton<RemoteDashboardServer>();
+        services.AddSingleton<IRemoteDashboard>(sp => sp.GetRequiredService<RemoteDashboardServer>());
+        services.AddHostedService(sp => sp.GetRequiredService<RemoteDashboardServer>());
         return services;
     }
 }

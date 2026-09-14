@@ -1,0 +1,277 @@
+@page "/remote"
+@using System.Diagnostics
+@using QRCoder
+@implements IDisposable
+@inject IRemoteDashboard Dashboard
+@inject ISettingsService SettingsService
+
+<div class="remote">
+    <header class="page-header">
+        <div class="title-group">
+            <h1 class="page-title">Phone Dashboard</h1>
+            <span class="page-detail">Read-only · same network</span>
+        </div>
+    </header>
+
+    <section class="card">
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Allow phone access</div>
+                <div class="setting-hint">Lets your phone view SysPulse's live readings over your home Wi-Fi. Phones can't change anything on this PC.</div>
+            </div>
+            <ToggleSwitch Value="_settings.RemoteEnabled" ValueChanged="@((bool on) => SetEnabled(on))" />
+        </div>
+
+        @if (_settings.RemoteEnabled)
+        {
+            <div class="status @StatusClass">
+                <span class="lamp"></span>
+                <span>@StatusText</span>
+            </div>
+        }
+    </section>
+
+    @if (_settings.RemoteEnabled && NeedsSetup)
+    {
+        <section class="card">
+            <h2 class="card-title">One-time setup</h2>
+            <p class="text">
+                Windows needs permission, once, before phones can connect: a reservation for port @_settings.RemotePort and a
+                firewall rule that only applies on private networks (home Wi-Fi, not public hotspots). Windows will ask for
+                administrator approval.
+            </p>
+            <div class="actions">
+                <button type="button" class="button" @onclick="RunSetupAsync" disabled="@_busy">Run setup</button>
+            </div>
+            @if (_setupMessage is not null)
+            {
+                <p class="hint">@_setupMessage</p>
+            }
+        </section>
+    }
+
+    @if (_settings.RemoteEnabled && Dashboard.State is RemoteState.Running or RemoteState.LocalOnly)
+    {
+        <section class="card pair">
+            @if (Dashboard.State == RemoteState.Running && _qrImage is not null)
+            {
+                <img class="qr" src="@_qrImage" alt="QR code that opens the phone dashboard" />
+            }
+
+            <div class="pair-body">
+                <h2 class="card-title">Connect a phone</h2>
+
+                @if (Dashboard.State == RemoteState.LocalOnly)
+                {
+                    <p class="text">Phones can't connect until the one-time setup is done, but you can preview the dashboard on this PC.</p>
+                }
+                else if (_addresses.Count == 0)
+                {
+                    <p class="text">This PC isn't connected to a network right now.</p>
+                }
+                else
+                {
+                    <ol class="steps">
+                        <li>Connect the phone to the same Wi-Fi as this PC.</li>
+                        <li>Scan the code with the phone's camera and open the link.</li>
+                        <li>Optional: choose <em>Add to Home Screen</em> to open it like an app.</li>
+                    </ol>
+                    <div class="addresses">
+                        @foreach (var address in _addresses)
+                        {
+                            <span class="readout">@address</span>
+                        }
+                    </div>
+                }
+
+                <div class="actions">
+                    @if (Dashboard.State == RemoteState.Running && _addresses.Count > 0)
+                    {
+                        <button type="button" class="button secondary" @onclick="CopyLink">@(_copied ? "Copied" : "Copy pairing link")</button>
+                    }
+                    <button type="button" class="button secondary" @onclick="OpenPreview">Preview on this PC</button>
+                    <button type="button" class="button secondary" @onclick="NewKey" @onfocusout="() => _confirmNewKey = false">
+                        @(_confirmNewKey ? "Confirm new key" : "New key")
+                    </button>
+                </div>
+                <p class="hint">
+                    The pairing link works like a password, so only open it on your own devices. <em>New key</em> disconnects every
+                    paired phone. If this PC's address changes, scan the code again.
+                </p>
+            </div>
+        </section>
+    }
+
+    <section class="card">
+        <h2 class="card-title">Advanced</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Port</div>
+                <div class="setting-hint">Change it only if another app already uses port @AppSettings.DefaultRemotePort. A new port needs the one-time setup again.</div>
+            </div>
+            <input class="field" type="number" min="1024" max="65535" value="@_settings.RemotePort" @onchange="SetPort" />
+        </div>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Remove setup</div>
+                <div class="setting-hint">Deletes the port reservation and the firewall rule. Windows will ask for administrator approval.</div>
+            </div>
+            <button type="button" class="button secondary" @onclick="RemoveSetupAsync" disabled="@_busy">Remove</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    private AppSettings _settings = new();
+    private IReadOnlyList<string> _addresses = [];
+    private bool _hasFirewallRule;
+    private string? _qrLink;
+    private string? _qrImage;
+    private string? _setupMessage;
+    private bool _busy;
+    private bool _copied;
+    private bool _confirmNewKey;
+
+    private bool NeedsSetup =>
+        Dashboard.State == RemoteState.LocalOnly || (Dashboard.State == RemoteState.Running && !_hasFirewallRule);
+
+    private string PairingLink => (_addresses.FirstOrDefault() ?? $"http://localhost:{_settings.RemotePort}/") + "?key=" + _settings.RemoteKey;
+
+    private string StatusClass => Dashboard.State switch
+    {
+        RemoteState.Running when _hasFirewallRule => "ok",
+        RemoteState.Failed => "error",
+        _ => "warn",
+    };
+
+    private string StatusText => Dashboard.State switch
+    {
+        RemoteState.Running when !_hasFirewallRule => "Listening, but Windows Firewall will block phones until the one-time setup is done.",
+        RemoteState.Running => $"Listening on port {Dashboard.Port} · {Phones(Dashboard.ConnectedPhones)} connected" +
+                               (Dashboard.LastSeen is { } seen ? $" · last seen {seen.ToString("t", CultureInfo.CurrentCulture)}" : ""),
+        RemoteState.LocalOnly => "Only this PC can connect until the one-time setup is done.",
+        RemoteState.Failed => Dashboard.Error ?? "Couldn't start the phone dashboard.",
+        _ => "Starting…",
+    };
+
+    protected override void OnInitialized()
+    {
+        Refresh(checkFirewall: true);
+        Dashboard.StatusChanged += OnStatusChanged;
+        SettingsService.Changed += OnSettingsChanged;
+    }
+
+    private void OnStatusChanged() => _ = InvokeAsync(() => { Refresh(checkFirewall: false); StateHasChanged(); });
+
+    private void OnSettingsChanged(AppSettings settings) => _ = InvokeAsync(() => { Refresh(checkFirewall: false); StateHasChanged(); });
+
+    private void Refresh(bool checkFirewall)
+    {
+        _settings = SettingsService.Current;
+        _addresses = _settings.RemoteEnabled ? Dashboard.Addresses() : [];
+
+        if (checkFirewall)
+            _hasFirewallRule = RemoteSetup.HasFirewallRule();
+
+        // Only redraw the QR code when the link actually changes.
+        var link = PairingLink;
+        if (link != _qrLink)
+        {
+            _qrLink = link;
+            _qrImage = _settings.RemoteKey.Length == 0 ? null : QrImage(link);
+        }
+    }
+
+    private static string QrImage(string text)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(text, QRCodeGenerator.ECCLevel.M);
+        return "data:image/png;base64," + Convert.ToBase64String(new PngByteQRCode(data).GetGraphic(6));
+    }
+
+    private void SetEnabled(bool on)
+    {
+        SettingsService.Update(s => s with
+        {
+            RemoteEnabled = on,
+            RemoteKey = s.RemoteKey.Length > 0 ? s.RemoteKey : RemoteSetup.NewPairingKey(),
+        });
+        Refresh(checkFirewall: on);
+    }
+
+    private void SetPort(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var port) && port is >= 1024 and <= 65535)
+            SettingsService.Update(s => s with { RemotePort = port });
+
+        Refresh(checkFirewall: false);
+    }
+
+    // Two clicks, so a stray click doesn't unpair every phone.
+    private void NewKey()
+    {
+        if (!_confirmNewKey)
+        {
+            _confirmNewKey = true;
+            return;
+        }
+
+        _confirmNewKey = false;
+        SettingsService.Update(s => s with { RemoteKey = RemoteSetup.NewPairingKey() });
+        Refresh(checkFirewall: false);
+    }
+
+    private async Task CopyLink()
+    {
+        System.Windows.Clipboard.SetText(PairingLink);
+        _copied = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        _copied = false;
+    }
+
+    private void OpenPreview()
+    {
+        var link = $"http://localhost:{_settings.RemotePort}/?key={_settings.RemoteKey}";
+        Process.Start(new ProcessStartInfo(link) { UseShellExecute = true })?.Dispose();
+    }
+
+    private async Task RunSetupAsync()
+    {
+        _busy = true;
+        _setupMessage = "Waiting for Windows…";
+        var port = _settings.RemotePort;
+
+        var approved = await Task.Run(() => RemoteSetup.Install(port));
+        Dashboard.Restart();
+        Refresh(checkFirewall: true);
+
+        _setupMessage = !approved ? "Setup was cancelled."
+            : Dashboard.State == RemoteState.Running && _hasFirewallRule ? null
+            : "Setup didn't finish. Try again, or check that your account can approve administrator prompts.";
+        _busy = false;
+    }
+
+    private async Task RemoveSetupAsync()
+    {
+        _busy = true;
+        var port = _settings.RemotePort;
+
+        var approved = await Task.Run(() => RemoteSetup.Uninstall(port));
+        Dashboard.Restart();
+        Refresh(checkFirewall: true);
+
+        _setupMessage = approved ? "Setup removed." : "Removal was cancelled.";
+        _busy = false;
+    }
+
+    private static string Phones(int count) => count == 1 ? "1 phone" : $"{count} phones";
+
+    public void Dispose()
+    {
+        Dashboard.StatusChanged -= OnStatusChanged;
+        SettingsService.Changed -= OnSettingsChanged;
+    }
+}

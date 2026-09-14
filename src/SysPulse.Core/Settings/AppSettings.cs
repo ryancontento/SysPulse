@@ -39,6 +39,16 @@ public sealed record AppSettings
 
     public double? WidgetTop { get; init; }
 
+    /// <summary>Serves the read-only phone dashboard on the local network.</summary>
+    public bool RemoteEnabled { get; init; }
+
+    public int RemotePort { get; init; } = DefaultRemotePort;
+
+    /// <summary>Pairing key phones must present. Empty until phone access is first turned on.</summary>
+    public string RemoteKey { get; init; } = "";
+
+    public const int DefaultRemotePort = 8787;
+
     public IReadOnlyList<AlertRule> Rules { get; init; } = AlertRule.Defaults;
 
     /// <summary>Pulls values from a hand-edited or older settings file back into supported ranges.</summary>
@@ -50,6 +60,8 @@ public sealed record AppSettings
         ProcessRows = Math.Clamp(ProcessRows, 10, 500),
         WidgetLeft = WidgetLeft is { } left && double.IsFinite(left) ? left : null,
         WidgetTop = WidgetTop is { } top && double.IsFinite(top) ? top : null,
+        RemotePort = RemotePort is >= 1024 and <= 65535 ? RemotePort : DefaultRemotePort,
+        RemoteKey = RemoteKey ?? "",
         Rules = (Rules ?? []).Where(r => r is not null).Select(r => r.Normalize()).Take(MaxRules).ToArray(),
     };
 

@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en" data-accent="amber">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#13120f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>SysPulse</title>
+<style>
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-sans-400.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("/fonts/ibm-plex-sans-600.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-mono-400.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: swap; src: url("/fonts/ibm-plex-mono-500.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; font-display: swap; src: url("/fonts/ibm-plex-mono-600.woff2") format("woff2"); }
+
+/* Same tokens as the desktop app (wwwroot/css/app.css). */
+:root {
+    color-scheme: dark;
+    --bg-app: #13120f;
+    --bg-card: #1a1915;
+    --bg-raised: #211f1a;
+    --border: #2e2b25;
+    --border-strong: #3b372f;
+    --text: #ece5d5;
+    --text-muted: #a39a88;
+    --text-faint: #6b6457;
+    --track: #2a2721;
+    --ok: #9cc084;
+    --warn: #f0a33a;
+    --danger: #e5584a;
+    --accent: #f0a33a;
+    --accent-glow: rgba(240, 163, 58, 0.4);
+    --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+[data-accent="phosphor"] { --accent: #6fdc8c; --accent-glow: rgba(111, 220, 140, 0.4); }
+[data-accent="arctic"] { --accent: #8fd3e8; --accent-glow: rgba(143, 211, 232, 0.4); }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+    margin: 0;
+    overflow-x: hidden;
+    background: var(--bg-app);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    min-height: 100vh;
+    padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    background-image: radial-gradient(rgba(236, 229, 213, 0.045) 1px, transparent 1.2px);
+    background-size: 20px 20px;
+}
+
+.top { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 14px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 17px; }
+.brand b { font-weight: 600; }
+.brand span { color: var(--text-muted); }
+.lamp { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 9px var(--accent-glow); }
+.host { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); text-align: right; }
+.link { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 3px; color: var(--text-faint); }
+.link i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.link.ok i { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.link.stale i { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.link.down i { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+/* minmax(0, 1fr): plain 1fr won't shrink below content, and an SVG's 300px intrinsic width pushed the page off-screen. */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card {
+    min-width: 0;
+    padding: 12px 13px;
+    background: linear-gradient(180deg, var(--bg-raised), var(--bg-card) 72px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.wide { grid-column: 1 / -1; }
+
+.label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
+.label small { overflow: hidden; font-weight: 400; letter-spacing: 0.04em; text-transform: none; color: var(--text-faint); text-overflow: ellipsis; white-space: nowrap; }
+
+.big { margin-top: 6px; font-family: var(--font-mono); font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.big .u { margin-left: 2px; font-size: 0.5em; color: var(--text-muted); }
+.rate { margin-top: 8px; font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; }
+.rate + .rate { margin-top: 2px; color: var(--text-muted); }
+
+/* Segmented LED meter */
+.meter { height: 6px; margin-top: 8px; background: repeating-linear-gradient(90deg, var(--track) 0 5px, transparent 5px 7px); }
+.meter i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 7px); transition: width 0.4s ease; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.stats em { margin-right: 5px; font-style: normal; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); }
+
+.badge { display: none; width: fit-content; margin-top: 8px; padding: 1px 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); border: 1px solid rgba(240, 163, 58, 0.35); border-radius: 3px; }
+.badge.show { display: block; }
+.badge.thermal { color: var(--danger); border-color: rgba(229, 88, 74, 0.45); }
+
+.spark { display: block; width: 100%; min-width: 0; max-width: 100%; height: 34px; margin-top: 10px; background: #0c0b09; border: 1px solid var(--border); border-radius: 3px; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.spark path.second { stroke: var(--text-muted); stroke-opacity: 0.7; }
+
+.strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 12px; }
+.strip em { margin-right: 6px; font-style: normal; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+.alert { display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+.alert i { width: 7px; height: 7px; border-radius: 50%; background: var(--track); }
+.alert.on { color: var(--danger); }
+.alert.on i { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+.rows { margin-top: 6px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px 64px; gap: 8px; padding: 7px 0; font-size: 13px; border-top: 1px dashed var(--border); }
+.row:first-child { border-top: none; }
+.row.head { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+
+.entry { padding: 7px 0; font-size: 13px; line-height: 1.4; border-top: 1px dashed var(--border); }
+.entry:first-child { border-top: none; }
+.entry time { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+.empty { margin: 8px 0 2px; font-size: 13px; color: var(--text-faint); }
+
+.gate { max-width: 340px; margin: 16vh auto 0; text-align: center; }
+.gate h1 { margin: 0 0 10px; font-size: 20px; font-weight: 600; }
+.gate p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-muted); }
+
+footer { margin-top: 16px; text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<header class="top">
+    <div class="brand"><i class="lamp"></i><div><b>SYS</b><span>PULSE</span></div></div>
+    <div class="host">
+        <div id="host">&nbsp;</div>
+        <div class="link" id="link"><i></i><span id="link-text">Connecting</span></div>
+    </div>
+</header>
+
+<section class="gate" id="gate" hidden>
+    <h1 id="gate-title">Not paired yet</h1>
+    <p id="gate-text">On your PC, open SysPulse → Phone and scan the QR code with this phone's camera.</p>
+</section>
+
+<main id="dash" hidden>
+    <div class="grid">
+        <section class="card" id="cpu-card">
+            <div class="label">CPU</div>
+            <div class="big"><span id="cpu-load">--</span><span class="u">%</span></div>
+            <div class="meter"><i id="cpu-meter"></i></div>
+            <div class="stats"><span><em>Temp</em><span id="cpu-temp">--</span></span><span><em>Pwr</em><span id="cpu-power">--</span></span></div>
+            <div class="badge" id="cpu-badge"></div>
+            <svg class="spark" viewBox="0 0 300 100" preserveAspectRatio="none"><path id="cpu-spark"></path></svg>
+        </section>
+
+        <section class="card" id="gpu-card">
+            <div class="label">GPU</div>
+            <div class="big"><span id="gpu-load">--</span><span class="u">%</span></div>
+            <div class="meter"><i id="gpu-meter"></i></div>
+            <div class="stats"><span><em>Temp</em><span id="gpu-temp">--</span></span><span><em>Pwr</em><span id="gpu-power">--</span></span></div>
+            <div class="badge" id="gpu-badge"></div>
+            <svg class="spark" viewBox="0 0 300 100" preserveAspectRatio="none"><path id="gpu-spark"></path></svg>
+        </section>
+
+        <section class="card">
+            <div class="label">Memory</div>
+            <div class="big"><span id="mem-load">--</span><span class="u">%</span></div>
+            <div class="meter"><i id="mem-meter"></i></div>
+            <div class="stats"><span id="mem-used">--</span></div>
+            <svg class="spark" viewBox="0 0 300 100" preserveAspectRatio="none"><path id="mem-spark"></path></svg>
+        </section>
+
+        <section class="card">
+            <div class="label">Disk</div>
+            <div class="big"><span id="disk-active">--</span><span class="u">%</span></div>
+            <div class="meter"><i id="disk-meter"></i></div>
+            <div class="stats"><span id="disk-free">--</span></div>
+            <svg class="spark" viewBox="0 0 300 100" preserveAspectRatio="none"><path id="disk-spark"></path></svg>
+        </section>
+
+        <section class="card wide">
+            <div class="label">Network</div>
+            <div class="grid">
+                <div><div class="rate">▼ <span id="net-down">--</span></div><div class="rate">▲ <span id="net-up">--</span></div></div>
+                <svg class="spark" viewBox="0 0 300 100" preserveAspectRatio="none"><path class="second" id="up-spark"></path><path id="down-spark"></path></svg>
+            </div>
+        </section>
+
+        <section class="card wide">
+            <div class="strip">
+                <span><em>Profile</em><span id="profile">--</span></span>
+                <span class="alert" id="alert"><i></i>Alert</span>
+            </div>
+        </section>
+
+        <section class="card wide">
+            <div class="label">Busiest processes</div>
+            <div class="rows" id="processes"></div>
+        </section>
+
+        <section class="card wide">
+            <div class="label">Rule activity</div>
+            <div id="activity"></div>
+        </section>
+    </div>
+    <footer>Read-only · updates live</footer>
+</main>
+
+<script>
+(() => {
+    "use strict";
+
+    const HISTORY_POINTS = 300;
+    const STORAGE_KEY = "syspulse-key";
+    const $ = id => document.getElementById(id);
+    const series = { cpu: [], gpu: [], mem: [], disk: [], down: [], up: [] };
+
+    let key = null;
+    let source = null;
+    let lastUpdate = 0;
+    let retryTimer = 0;
+
+    // A QR scan opens /?key=...; keep the key on this phone and take it out of the address bar.
+    const url = new URL(location.href);
+    if (url.searchParams.has("key")) {
+        key = url.searchParams.get("key");
+        try { localStorage.setItem(STORAGE_KEY, key); } catch { }
+        history.replaceState(null, "", "/");
+    } else {
+        try { key = localStorage.getItem(STORAGE_KEY); } catch { }
+    }
+
+    function setLink(state, text) {
+        $("link").className = "link " + state;
+        $("link-text").textContent = text;
+    }
+
+    function showGate(title, text) {
+        $("dash").hidden = true;
+        $("gate").hidden = false;
+        $("gate-title").textContent = title;
+        $("gate-text").textContent = text;
+    }
+
+    async function start() {
+        clearTimeout(retryTimer);
+        source?.close();
+        source = null;
+
+        if (!key) {
+            setLink("down", "Not paired");
+            showGate("Not paired yet", "On your PC, open SysPulse → Phone and scan the QR code with this phone's camera.");
+            return;
+        }
+
+        let response;
+        try {
+            response = await fetch("/api/history?minutes=5", { headers: { "X-SysPulse-Key": key }, cache: "no-store" });
+        } catch {
+            setLink("down", "Offline");
+            retryTimer = setTimeout(start, 5000);
+            return;
+        }
+
+        if (response.status === 401) {
+            try { localStorage.removeItem(STORAGE_KEY); } catch { }
+            key = null;
+            setLink("down", "Not paired");
+            showGate("Pairing expired", "SysPulse has a new pairing key. Scan the QR code in SysPulse → Phone again.");
+            return;
+        }
+
+        if (response.status === 429) {
+            setLink("down", "Locked out");
+            showGate("Too many attempts", "Wait ten minutes, then scan the QR code in SysPulse → Phone again.");
+            return;
+        }
+
+        if (!response.ok) {
+            setLink("down", "Error " + response.status);
+            retryTimer = setTimeout(start, 5000);
+            return;
+        }
+
+        let data;
+        try {
+            data = await response.json();
+        } catch {
+            setLink("down", "Bad response");
+            retryTimer = setTimeout(start, 5000);
+            return;
+        }
+
+        for (const name in series) series[name].length = 0;
+        for (const point of data.points) push(point.cpu, point.gpu, point.mem, point.disk, point.down, point.up);
+        drawSparks();
+
+        $("gate").hidden = true;
+        $("dash").hidden = false;
+        connect();
+    }
+
+    function connect() {
+        source = new EventSource("/api/stream?key=" + encodeURIComponent(key));
+        source.onmessage = event => {
+            lastUpdate = Date.now();
+            render(JSON.parse(event.data));
+        };
+        source.onerror = () => {
+            setLink("stale", "Reconnecting");
+            // EventSource retries dropped connections itself, but gives up on an error response (like a revoked key).
+            if (source.readyState === EventSource.CLOSED) retryTimer = setTimeout(start, 3000);
+        };
+    }
+
+    function render(s) {
+        document.documentElement.dataset.accent = s.accent;
+        $("host").textContent = s.host;
+
+        device("cpu", s.cpu, s.fahrenheit);
+        device("gpu", s.gpu, s.fahrenheit);
+
+        $("mem-load").textContent = whole(s.memory.load);
+        meter("mem-meter", s.memory.load);
+        $("mem-used").textContent = size(s.memory.used) + " / " + size(s.memory.total);
+
+        $("disk-active").textContent = whole(s.storage.active);
+        meter("disk-meter", s.storage.active);
+        $("disk-free").textContent = size(s.storage.total - s.storage.used) + " free";
+
+        $("net-down").textContent = rate(s.network.down);
+        $("net-up").textContent = rate(s.network.up);
+
+        $("profile").textContent = s.profile ?? "Custom plan";
+        $("alert").classList.toggle("on", s.alertActive);
+
+        processes(s.processes);
+        activity(s.activity);
+
+        push(s.cpu.load, s.gpu.load, s.memory.load, s.storage.active, s.network.down, s.network.up);
+        drawSparks();
+        setLink("ok", "Live");
+    }
+
+    function device(prefix, d, fahrenheit) {
+        $(prefix + "-card").title = d.name ?? "";
+        $(prefix + "-load").textContent = whole(d.load);
+        meter(prefix + "-meter", d.load);
+        $(prefix + "-temp").textContent = d.temp == null ? "--" : fahrenheit ? Math.round(d.temp * 9 / 5 + 32) + "°F" : Math.round(d.temp) + "°C";
+        $(prefix + "-power").textContent = d.power == null ? "--" : Math.round(d.power) + " W";
+
+        const badge = $(prefix + "-badge");
+        const labels = { Thermal: "Thermal throttling", Power: "Power limited", Limited: "Speed limited" };
+        badge.textContent = labels[d.throttle] ?? "";
+        badge.className = "badge" + (labels[d.throttle] ? " show" : "") + (d.throttle === "Thermal" ? " thermal" : "");
+    }
+
+    function processes(list) {
+        const box = $("processes");
+        const head = element("div", "row head");
+        head.append(element("span", "", "Process"), element("span", "n", "CPU"), element("span", "n", "GPU"), element("span", "n", "RAM"));
+        box.replaceChildren(head);
+
+        for (const p of list) {
+            const row = element("div", "row");
+            row.append(element("span", "name", p.name), element("span", "n", whole(p.cpu) + "%"), element("span", "n", whole(p.gpu) + "%"), element("span", "n", size(p.memory)));
+            box.append(row);
+        }
+    }
+
+    function activity(list) {
+        const box = $("activity");
+        if (list.length === 0) {
+            box.replaceChildren(element("p", "empty", "Nothing has triggered since SysPulse started."));
+            return;
+        }
+
+        box.replaceChildren(...list.map(entry => {
+            const row = element("div", "entry");
+            row.append(element("time", "", new Date(entry.time).toLocaleTimeString()), document.createTextNode(entry.message));
+            return row;
+        }));
+    }
+
+    function push(cpu, gpu, mem, disk, down, up) {
+        const values = { cpu, gpu, mem, disk, down, up };
+        for (const name in series) {
+            series[name].push(values[name]);
+            if (series[name].length > HISTORY_POINTS) series[name].shift();
+        }
+    }
+
+    function drawSparks() {
+        $("cpu-spark").setAttribute("d", path(series.cpu, 100));
+        $("gpu-spark").setAttribute("d", path(series.gpu, 100));
+        $("mem-spark").setAttribute("d", path(series.mem, 100));
+        $("disk-spark").setAttribute("d", path(series.disk, 100));
+
+        const networkMax = Math.max(1024, ...series.down.map(v => v ?? 0), ...series.up.map(v => v ?? 0));
+        $("down-spark").setAttribute("d", path(series.down, networkMax));
+        $("up-spark").setAttribute("d", path(series.up, networkMax));
+    }
+
+    // Newest point at the right edge; nulls (missing sensor) break the line.
+    function path(values, max) {
+        let d = "";
+        let penDown = false;
+        values.forEach((value, i) => {
+            if (value == null) { penDown = false; return; }
+            const x = (HISTORY_POINTS - values.length + i) / (HISTORY_POINTS - 1) * 300;
+            const y = 98 - Math.min(1, Math.max(0, value / max)) * 96;
+            d += (penDown ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1);
+            penDown = true;
+        });
+        return d;
+    }
+
+    function meter(id, percent) {
+        $(id).style.width = (percent == null ? 0 : Math.min(100, Math.max(0, percent))) + "%";
+    }
+
+    function element(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text != null) node.textContent = text;
+        return node;
+    }
+
+    function whole(value) {
+        return value == null ? "--" : String(Math.round(value));
+    }
+
+    function size(bytes) {
+        return bytes >= 1073741824 ? (bytes / 1073741824).toFixed(1) + " GB" : Math.round(bytes / 1048576) + " MB";
+    }
+
+    function rate(bytesPerSecond) {
+        const units = ["KB/s", "MB/s", "GB/s"];
+        let value = bytesPerSecond / 1024;
+        let unit = 0;
+        while (value >= 1000 && unit < units.length - 1) { value /= 1024; unit++; }
+        return (value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)) + " " + units[unit];
+    }
+
+    // Stop streaming while the tab is in the background to save battery; catch up with history on return.
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            clearTimeout(retryTimer);
+            source?.close();
+            source = null;
+        } else {
+            start();
+        }
+    });
+
+    setInterval(() => {
+        if (source && lastUpdate && Date.now() - lastUpdate > 8000) setLink("stale", "No updates");
+    }, 2000);
+
+    start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+.remote {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 880px;
+}
+
+.title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 12px 0;
+    border-top: 1px dashed var(--border-strong);
+}
+
+.card > .setting:first-child,
+.card-title + .setting {
+    border-top: none;
+}
+
+.card > .setting:first-child {
+    padding-top: 0;
+}
+
+.setting-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.setting-hint,
+.hint {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.hint {
+    margin: 12px 0 0;
+    color: var(--text-faint);
+}
+
+.text {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+
+    --lamp: var(--warn);
+}
+
+.status.ok {
+    --lamp: var(--ok);
+}
+
+.status.error {
+    --lamp: var(--danger);
+    color: var(--danger);
+}
+
+.lamp {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--lamp);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 8px var(--lamp);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.pair {
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+}
+
+/* White quiet zone and crisp modules so phone cameras read it reliably. */
+.qr {
+    flex-shrink: 0;
+    width: 196px;
+    height: 196px;
+    padding: 6px;
+    background: #fff;
+    border-radius: 4px;
+    image-rendering: pixelated;
+    box-shadow: 0 0 0 1px var(--border-strong), 0 0 18px var(--accent-soft);
+}
+
+.pair-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.steps {
+    margin: 10px 0 0;
+    padding-left: 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.addresses {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 10px;
+    color: var(--accent);
+    font-size: 13px;
+}
+
+.field {
+    width: 96px;
+    height: 30px;
+    padding: 0 8px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    user-select: text;
+}
+
+.field:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}

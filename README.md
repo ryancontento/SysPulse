@@ -33,16 +33,21 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
 - **Mini widget:** a slim always-on-top strip styled like a piece of rack gear, with CPU, GPU, RAM, and
   network readouts plus throttle and alert lamps. Drag to move, double-click to open SysPulse. Toggle it
   from the tray menu or Settings.
+- **Phone:** a read-only phone dashboard over your home Wi-Fi (off by default). Turn it on, run the one-time
+  setup (one UAC prompt), and scan the QR code. Phones pair with a random key; *New key* unpairs them all.
 - **Tray:** closing the window keeps SysPulse running in the tray (turn off in Settings), so rules and
   the Flight Recorder keep working. Right-click the tray icon to exit.
 
 SysPulse only reads from your system, with two exceptions: the audio volume and mute controls, and the
 Windows power mode when you pick a profile or a rule switches one. Picking a profile also switches to
-the Balanced power plan, because Windows only applies power modes under that plan. It makes no network
-connections, has no telemetry, and only writes to `%APPDATA%\SysPulse` (settings and rules) and
+the Balanced power plan, because Windows only applies power modes under that plan. It never connects out to the
+internet and has no telemetry. When **Phone access** is on, it accepts connections from your local network
+only, and only from devices with the pairing key. It only writes to `%APPDATA%\SysPulse` (settings and rules) and
 `%LOCALAPPDATA%\SysPulse` (WebView2's browser cache). Turning on **Start with Windows** also adds a
 `SysPulse` entry to your user's Run registry key, or a `SysPulse` scheduled task when SysPulse is
-running as administrator; turning it off removes it.
+running as administrator; turning it off removes it. The Phone page's one-time setup adds a URL reservation
+for its port and a Windows Firewall rule named `SysPulse phone dashboard` (private networks only); *Remove
+setup* deletes both.
 
 ## Run
 
@@ -100,6 +105,7 @@ src/
     Power/              Profiles mapped to Windows power modes
     Diagnostics/        SlowdownAnalyzer for the Why Slow? page
     Startup/            Start with Windows (Run key or scheduled task)
+    Remote/             Phone dashboard: HttpListener server, one-time setup, and the phone page (phone.html)
   SysPulse.App/         WPF host + Blazor UI
     MainWindow.xaml     Custom title bar (with the profile dropdown) and the BlazorWebView
     TrayIcon.cs         Notification-area icon; shows rule notifications

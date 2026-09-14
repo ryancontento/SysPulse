@@ -42,6 +42,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.101" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />  </ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
 
 </Project>
