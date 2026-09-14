@@ -29,6 +29,8 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
     private readonly GpuEngineCollector _gpuEngines = new();
     private readonly HardwareSensorCollector _hardware = new();
     private readonly ProcessNetworkCollector _processNetwork = new();
+    private readonly ThrottleCollector _throttle = new();
+    private readonly DiskActivityCollector _diskActivity = new();
 
     private readonly HashSet<string> _failingCollectors = [];
     private StorageMetrics _lastStorage = new(0, 0);
@@ -76,6 +78,7 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
             // where a slow Initialize or an in-flight Collect could still be using them.
             _processNetwork.Dispose();
             _hardware.Dispose();
+            _throttle.Dispose();
         }
     }
 
@@ -121,12 +124,17 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
         var cpuLoad = Sample("CPU load", _cpuLoad.Sample, previous.Cpu.LoadPercent);
         var memory = Sample("Memory", _memory.Sample, previous.Memory);
         var network = Sample("Network", _network.Sample, previous.Network);
+        var diskActive = Sample<double?>("Disk activity", _diskActivity.Sample, null);
 
         if (_tick++ % StorageSampleEveryTicks == 0)
             _lastStorage = Sample("Storage", _storage.Sample, _lastStorage);
 
-        var cpu = new DeviceMetrics(cpuSensors.Name, cpuLoad, cpuSensors.TemperatureC, cpuSensors.ClockMhz, cpuSensors.FanRpm);
-        var gpu = new DeviceMetrics(gpuSensors.Name, gpuSensors.LoadPercent ?? gpuEngines.TotalPercent, gpuSensors.TemperatureC, gpuSensors.ClockMhz, gpuSensors.FanRpm);
+        var gpuLoad = gpuSensors.LoadPercent ?? gpuEngines.TotalPercent;
+        var cpuThrottle = Sample("CPU throttle", () => _throttle.Cpu(cpuLoad, cpuSensors), null);
+        var gpuThrottle = Sample("GPU throttle", () => _throttle.Gpu(gpuLoad, gpuSensors.Name), null);
+
+        var cpu = new DeviceMetrics(cpuSensors.Name, cpuLoad, cpuSensors.TemperatureC, cpuSensors.ClockMhz, cpuSensors.FanRpm, cpuSensors.PowerWatts, cpuThrottle);
+        var gpu = new DeviceMetrics(gpuSensors.Name, gpuLoad, gpuSensors.TemperatureC, gpuSensors.ClockMhz, gpuSensors.FanRpm, gpuSensors.PowerWatts, gpuThrottle);
 
         var groupByName = settings.Current.GroupProcesses;
         var processes = processSamples
@@ -168,7 +176,7 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
             gpu,
             memory,
             network,
-            _lastStorage,
+            _lastStorage with { ActivePercent = diskActive },
             processes,
             new CollectorStatus(_isElevated, cpuSensors.TemperatureC.HasValue, _processNetwork.IsAvailable));
     }

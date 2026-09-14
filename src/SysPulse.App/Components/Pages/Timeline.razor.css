@@ -1,0 +1,371 @@
+.recorder {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    min-height: 660px;
+}
+
+a.button {
+    text-decoration: none;
+}
+
+.title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.rec-lamp {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 8px;
+    vertical-align: 1px;
+    background: var(--danger);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(229, 88, 74, 0.6);
+    animation: blink 2s steps(1) infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0.25; }
+}
+
+/* Scope */
+
+.scope-card {
+    flex-shrink: 0;
+}
+
+.scope {
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 12px;
+}
+
+.labels,
+.lanes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lane-label {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    height: 62px;
+    min-width: 0;
+}
+
+.lane-name {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.lane-value {
+    font-size: 22px;
+    font-weight: 500;
+}
+
+.lane-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.pair-label {
+    width: 34px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.swatch {
+    flex-shrink: 0;
+    width: 10px;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 4px var(--accent-glow);
+}
+
+.swatch.secondary {
+    background: var(--text-muted);
+    box-shadow: none;
+}
+
+.plots {
+    min-width: 0;
+}
+
+.lanes {
+    position: relative;
+    cursor: crosshair;
+}
+
+.plot {
+    position: relative;
+    height: 62px;
+    overflow: hidden;
+    /* Phosphor screen with a graticule: whole-minute columns and a centre line. */
+    background-color: #0c0b09;
+    background-image:
+        linear-gradient(to right, rgba(236, 229, 213, 0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(236, 229, 213, 0.045) 1px, transparent 1px);
+    background-size: calc(100% / var(--divisions)) 100%, 100% 50%;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.6);
+}
+
+svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.trace {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 2px var(--accent-glow));
+}
+
+.trace.secondary {
+    stroke: var(--text-muted);
+    stroke-opacity: 0.75;
+    filter: none;
+}
+
+.event-region {
+    fill: rgba(229, 88, 74, 0.16);
+}
+
+.scale {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    pointer-events: none;
+}
+
+.cursor {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    pointer-events: none;
+}
+
+.cursor.hover {
+    border-left: 1px dashed var(--text-muted);
+}
+
+.cursor.pinned {
+    border-left: 1px solid var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.axis {
+    position: relative;
+    height: 18px;
+    margin-top: 4px;
+}
+
+.tick {
+    position: absolute;
+    top: 2px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.tick.first {
+    transform: none;
+}
+
+.tick.last {
+    transform: translateX(-100%);
+}
+
+/* Lower panels */
+
+.lower {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    min-height: 220px;
+}
+
+.inspect,
+.events {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.card-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chip {
+    padding: 0 6px;
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+}
+
+.chip.pinned,
+.chip.live {
+    color: var(--accent);
+    border-color: var(--accent-border);
+}
+
+.empty {
+    margin: 4px 0 0;
+    color: var(--text-faint);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.process-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.process-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px 56px 76px;
+    gap: 8px;
+    padding: 5px 2px;
+    font-size: 13px;
+    border-top: 1px dashed var(--border);
+}
+
+.process-row.head {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-top: none;
+}
+
+.process-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.num {
+    text-align: right;
+}
+
+.process-row:not(.head) .num {
+    color: var(--text-muted);
+}
+
+.event-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.event {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.event:hover {
+    background: var(--bg-hover);
+}
+
+.event.selected {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+}
+
+.event-lamp {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    margin-top: 6px;
+    background: var(--danger);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(229, 88, 74, 0.5);
+}
+
+.event-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.event-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.event-title {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.event-time {
+    flex-shrink: 0;
+    color: var(--text-faint);
+    font-size: 11px;
+}
+
+.event-culprits {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -1,0 +1,214 @@
+.rules-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 980px;
+}
+
+.hint {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.hint.empty {
+    margin-top: 10px;
+}
+
+.footnote {
+    margin-top: 12px;
+    color: var(--text-faint);
+}
+
+.error-text {
+    margin: 10px 0 0;
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 8px 8px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+}
+
+.profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+/* Rules */
+
+.rule-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+}
+
+.rule {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-top: 1px dashed var(--border-strong);
+}
+
+.rule:first-child {
+    border-top: none;
+}
+
+.rule.disabled .sentence {
+    opacity: 0.5;
+}
+
+.rule-lamp {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--track);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.rule-lamp.on {
+    background: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 8px var(--accent-glow);
+}
+
+.sentence {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    min-width: 0;
+}
+
+.word {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* Keeps the arrow on the same line as the action when the sentence wraps. */
+.then {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.arrow {
+    color: var(--accent);
+    font-family: var(--font-mono);
+}
+
+.field {
+    height: 28px;
+    padding: 0 8px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    user-select: text;
+}
+
+.field:hover {
+    border-color: var(--text-faint);
+}
+
+.field:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.field::placeholder {
+    color: var(--text-faint);
+}
+
+.field option {
+    color: var(--text);
+    background: var(--bg-raised);
+}
+
+.number {
+    width: 64px;
+}
+
+.text {
+    width: 230px;
+}
+
+.delete {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--text-faint);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.delete:hover {
+    color: var(--danger);
+    border-color: var(--border-strong);
+}
+
+.delete svg {
+    width: 11px;
+    height: 11px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+}
+
+/* Activity */
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 240px;
+    margin-top: 6px;
+    overflow-y: auto;
+}
+
+.activity {
+    display: flex;
+    gap: 14px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-top: 1px dashed var(--border);
+}
+
+.activity:first-child {
+    border-top: none;
+}
+
+.activity-time {
+    flex-shrink: 0;
+    width: 88px;
+    color: var(--text-faint);
+    font-size: 12px;
+}
+
+.activity-message {
+    color: var(--text);
+}

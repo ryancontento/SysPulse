@@ -2,6 +2,7 @@
 @using System.Diagnostics
 @using System.Reflection
 @inject ISettingsService SettingsService
+@inject IStartupService StartupService
 
 <div class="settings">
     <header class="page-header">
@@ -42,6 +43,40 @@
                     </button>
                 }
             </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">Startup</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Start with Windows</div>
+                <div class="setting-hint">@StartupHint</div>
+                @if (_startupError is not null)
+                {
+                    <div class="setting-hint error">@_startupError</div>
+                }
+            </div>
+            <ToggleSwitch Value="_startupMode != StartupMode.Off" ValueChanged="@((bool on) => SetStartup(on))" />
+        </div>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Mini widget</div>
+                <div class="setting-hint">A slim always-on-top strip with live readings for a second screen. Drag to move, double-click to open SysPulse. Also in the tray menu.</div>
+            </div>
+            <ToggleSwitch Value="_settings.ShowWidget"
+                          ValueChanged="@((bool on) => Update(s => s with { ShowWidget = on }))" />
+        </div>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Close to tray</div>
+                <div class="setting-hint">Closing the window keeps SysPulse running in the tray, so rules and the Flight Recorder keep working. Exit from the tray icon's menu.</div>
+            </div>
+            <ToggleSwitch Value="_settings.CloseToTray"
+                          ValueChanged="@((bool on) => Update(s => s with { CloseToTray = on }))" />
         </div>
     </section>
 
@@ -134,9 +169,57 @@
         (typeof(AccentPalette).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev")
         .Split('+')[0];
 
-    private AppSettings _settings = new();
+    private static readonly bool IsElevated = SysPulse.Core.Elevation.IsElevated();
 
-    protected override void OnInitialized() => _settings = SettingsService.Current;
+    private AppSettings _settings = new();
+    private StartupMode _startupMode;
+    private string? _startupError;
+
+    private string StartupHint => _startupMode switch
+    {
+        StartupMode.Elevated => "Starts in the tray as administrator when you sign in, with no UAC prompt.",
+        StartupMode.Standard when IsElevated => "Starts in the tray without administrator rights. Turn this off and on again to start as administrator instead.",
+        StartupMode.Standard => "Starts in the tray without administrator rights, so some sensors are missing. To fix that, run SysPulse as administrator and turn this off and on again.",
+        _ when IsElevated => "Starts in the tray when you sign in, as administrator with no UAC prompt.",
+        _ => "Starts in the tray when you sign in. Run SysPulse as administrator before turning this on to start with full sensor access and no UAC prompt.",
+    };
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.Current;
+        _startupMode = ReadStartupMode();
+    }
+
+    private StartupMode ReadStartupMode()
+    {
+        try
+        {
+            return StartupService.Current;
+        }
+        catch (Exception ex)
+        {
+            _startupError = ex.Message;
+            return StartupMode.Off;
+        }
+    }
+
+    private void SetStartup(bool on)
+    {
+        _startupError = null;
+        try
+        {
+            if (on)
+                StartupService.Enable();
+            else
+                StartupService.Disable();
+        }
+        catch (Exception ex)
+        {
+            _startupError = ex.Message;
+        }
+
+        _startupMode = ReadStartupMode();
+    }
 
     private void Update(Func<AppSettings, AppSettings> change)
     {

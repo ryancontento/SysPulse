@@ -1,0 +1,116 @@
+.checkup {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 980px;
+}
+
+.title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.summary,
+.finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+
+    /* Status lamp color; "all clear" by default. */
+    --lamp: var(--ok);
+}
+
+.warning {
+    --lamp: var(--warn);
+}
+
+.problem {
+    --lamp: var(--danger);
+}
+
+.finding.info {
+    --lamp: var(--text-faint);
+}
+
+.summary {
+    padding: 18px 20px;
+    border-left: 3px solid var(--lamp);
+}
+
+.lamp {
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    margin-top: 6px;
+    background: var(--lamp);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 10px var(--lamp);
+}
+
+.finding.info .lamp {
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.body {
+    flex: 1;
+    min-width: 0;
+}
+
+.summary-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.finding-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.finding-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.severity {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    color: var(--lamp);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+}
+
+.finding.info .severity {
+    color: var(--text-muted);
+}
+
+p {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.finding-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.error-text {
+    color: var(--danger);
+}
+
+.footnote {
+    margin: 2px 2px 0;
+    color: var(--text-faint);
+    font-size: 12px;
+}

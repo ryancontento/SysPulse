@@ -38,6 +38,10 @@
     font-size: 12px;
 }
 
+.setting-hint.error {
+    color: var(--danger);
+}
+
 .path {
     overflow: hidden;
     font-family: var(--font-mono);

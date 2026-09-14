@@ -104,8 +104,8 @@
                     <ComboBox x:Name="ProfileSelector"
                               Width="150"
                               FontSize="13"
-                              SelectedIndex="0"
-                              WindowChrome.IsHitTestVisibleInChrome="True">
+                              WindowChrome.IsHitTestVisibleInChrome="True"
+                              ToolTip="Windows power mode. Silent: best power efficiency. Default: balanced. Performance: best performance.">
                         <ComboBoxItem Content="Default" />
                         <ComboBoxItem Content="Silent" />
                         <ComboBoxItem Content="Performance" />

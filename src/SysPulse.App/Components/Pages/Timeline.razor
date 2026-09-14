@@ -1,0 +1,399 @@
+@page "/recorder"
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IFlightRecorder Recorder
+@inject ISettingsService SettingsService
+@inject IJSRuntime JS
+
+<div class="recorder">
+    <header class="page-header">
+        <div class="title-group">
+            <h1 class="page-title">Flight Recorder</h1>
+            <span class="page-detail"><span class="rec-lamp"></span>@RecordingDetail</span>
+        </div>
+        <div class="page-actions">
+            <a class="button secondary" href="check">Why is my PC slow?</a>
+            <SegmentedControl TValue="int" Options="WindowOptions" Value="_windowMinutes" ValueChanged="SetWindow" />
+        </div>
+    </header>
+
+    <section class="card scope-card">
+        <div class="scope">
+            <div class="labels">
+                @foreach (var lane in _lanes)
+                {
+                    <div class="lane-label">
+                        <span class="lane-name">@lane.Name</span>
+                        @if (lane.Traces.Count == 1)
+                        {
+                            <span class="lane-value readout">@Format(lane.Traces[0])</span>
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < lane.Traces.Count; i++)
+                            {
+                                var trace = lane.Traces[i];
+                                <span class="lane-pair">
+                                    <span class="swatch @(i > 0 ? "secondary" : null)"></span>
+                                    <span class="pair-label">@trace.Label</span>
+                                    <span class="readout">@Format(trace)</span>
+                                </span>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="plots">
+                <div class="lanes" @ref="_lanesElement" style="--divisions: @Divisions">
+                    @foreach (var lane in _lanes)
+                    {
+                        <div class="plot">
+                            <svg viewBox="0 0 1000 100" preserveAspectRatio="none">
+                                @foreach (var region in lane.Regions)
+                                {
+                                    <rect class="event-region" x="@Svg(region.X)" y="0" width="@Svg(region.Width)" height="100" />
+                                }
+                                @for (var i = lane.Traces.Count - 1; i >= 0; i--)
+                                {
+                                    <path class="trace @(i > 0 ? "secondary" : null)" d="@lane.Traces[i].Path" />
+                                }
+                            </svg>
+                            <span class="scale">@lane.Scale</span>
+                        </div>
+                    }
+
+                    @if (_pinned is { } pinned)
+                    {
+                        <div class="cursor pinned" style="left: @Css(TracePath.Percent(pinned, _start, Window))%"></div>
+                    }
+                    @if (_hoverFraction is { } hover)
+                    {
+                        <div class="cursor hover" style="left: @Css(hover * 100)%"></div>
+                    }
+                </div>
+
+                <div class="axis">
+                    @for (var i = 0; i <= Divisions; i++)
+                    {
+                        var minutesAgo = _windowMinutes * (Divisions - i) / Divisions;
+                        <span class="tick @(i == 0 ? "first" : i == Divisions ? "last" : null)" style="left: @Css(100.0 * i / Divisions)%">
+                            @(minutesAgo == 0 ? "now" : $"-{minutesAgo}m")
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="lower">
+        <section class="card inspect">
+            <header class="card-header">
+                <h2 class="card-title">Busiest processes</h2>
+                <span class="card-detail">
+                    @if (CursorTime is { } time)
+                    {
+                        <span class="chip @(_hoverFraction is null ? "pinned" : null)">@(_hoverFraction is null ? "Pinned" : "Cursor")</span>
+                        @Clock(time)
+                    }
+                    else
+                    {
+                        <span class="chip live">Live</span>
+                    }
+                </span>
+            </header>
+
+            @if (ReadoutSample is { } sample)
+            {
+                <div class="process-list">
+                    <div class="process-row head">
+                        <span>Process</span><span class="num">CPU</span><span class="num">GPU</span><span class="num">Memory</span>
+                    </div>
+                    @foreach (var process in sample.TopProcesses.OrderByDescending(p => p.CpuPercent))
+                    {
+                        <div class="process-row">
+                            <span class="process-name" title="@process.Name">@process.Name</span>
+                            <span class="num readout">@Percent(process.CpuPercent)</span>
+                            <span class="num readout">@Percent(process.GpuPercent)</span>
+                            <span class="num readout">@Memory(process.MemoryBytes)</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="empty">@(_samples.Count == 0 ? "Recording just started. Samples appear here within a second or two." : "Nothing was recorded at this point.")</p>
+            }
+
+            @if (_pinned is not null)
+            {
+                <footer class="card-footer">
+                    <button type="button" class="button secondary" @onclick="() => _pinned = null">Back to live</button>
+                </footer>
+            }
+        </section>
+
+        <section class="card events">
+            <header class="card-header">
+                <h2 class="card-title">Events</h2>
+                <span class="card-detail">@_events.Count in the last @_windowMinutes min</span>
+            </header>
+
+            @if (_events.Count == 0)
+            {
+                <p class="empty">
+                    Nothing unusual. An event is logged when CPU load stays above 85%, GPU load above 90%, memory above 90%,
+                    or the CPU or GPU runs hot or throttles from heat. Click one to see what was running.
+                </p>
+            }
+            else
+            {
+                <div class="event-list">
+                    @foreach (var recorderEvent in _events)
+                    {
+                        var selected = _pinned is { } p && p >= recorderEvent.Start && p <= recorderEvent.End;
+                        <button type="button" class="event @(selected ? "selected" : null)" @onclick="() => _pinned = recorderEvent.PeakTime">
+                            <span class="event-lamp"></span>
+                            <span class="event-body">
+                                <span class="event-head">
+                                    <span class="event-title">@Title(recorderEvent)</span>
+                                    <span class="event-time readout">@Clock(recorderEvent.Start) · @Duration(recorderEvent.Duration)</span>
+                                </span>
+                                <span class="event-culprits">@Culprits(recorderEvent)</span>
+                            </span>
+                        </button>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    private static readonly SegmentOption<int>[] WindowOptions = [new(5, "5 min"), new(15, "15 min"), new(60, "60 min")];
+
+    private int _windowMinutes = 15;
+    private IReadOnlyList<RecordedSample> _samples = [];
+    private IReadOnlyList<RecorderEvent> _events = [];
+    private IReadOnlyList<Lane> _lanes = [];
+    private DateTimeOffset _start;
+    private double? _hoverFraction;
+    private DateTimeOffset? _pinned;
+    private ElementReference _lanesElement;
+    private DotNetObjectReference<Timeline>? _selfReference;
+
+    private sealed record Lane(string Name, string Scale, IReadOnlyList<Trace> Traces, IReadOnlyList<(double X, double Width)> Regions);
+
+    private sealed record Trace(string Label, string Path, Func<RecordedSample, string> Format);
+
+    private TimeSpan Window => TimeSpan.FromMinutes(_windowMinutes);
+
+    // Graticule divisions, chosen so every tick lands on a whole minute.
+    private int Divisions => _windowMinutes == 60 ? 6 : 5;
+
+    private bool IsFahrenheit => SettingsService.Current.TemperatureUnit == TemperatureUnit.Fahrenheit;
+
+    private DateTimeOffset? CursorTime => _hoverFraction is { } f ? _start + Window * f : _pinned;
+
+    private RecordedSample? ReadoutSample => CursorTime is { } time ? SampleAt(time) : _samples.LastOrDefault();
+
+    private string RecordingDetail
+    {
+        get
+        {
+            if (Recorder.OldestTimestamp is not { } oldest)
+                return "Rec · waiting";
+
+            var recorded = DateTimeOffset.Now - oldest;
+            return recorded.TotalMinutes >= 1
+                ? $"Rec · {(int)recorded.TotalMinutes} of {(int)Recorder.Retention.TotalMinutes} min kept"
+                : $"Rec · {(int)recorded.TotalSeconds} s kept";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Rebuild();
+        Recorder.Recorded += OnRecorded;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _selfReference = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("sysPulseScope.attach", _lanesElement, _selfReference);
+    }
+
+    [JSInvokable]
+    public Task OnPointer(string kind, double fraction) =>
+        InvokeAsync(() =>
+        {
+            switch (kind)
+            {
+                case "move":
+                    _hoverFraction = fraction;
+                    break;
+                case "leave":
+                    _hoverFraction = null;
+                    break;
+                case "click":
+                    _pinned = SampleAt(_start + Window * fraction)?.Timestamp;
+                    break;
+            }
+
+            StateHasChanged();
+        });
+
+    private void OnRecorded(RecordedSample sample) =>
+        _ = InvokeAsync(() =>
+        {
+            Rebuild();
+            StateHasChanged();
+        });
+
+    private void SetWindow(int minutes)
+    {
+        _windowMinutes = minutes;
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        _start = DateTimeOffset.Now - Window;
+        _samples = Recorder.GetSamples(Window);
+        _events = EventDetector.Find(_samples);
+
+        if (_pinned < _start)
+            _pinned = null;
+
+        var networkMax = Math.Max(1024, _samples.Select(s => Math.Max(s.DownloadBytesPerSec, s.UploadBytesPerSec)).DefaultIfEmpty().Max());
+        var powerMax = Math.Max(10, _samples.Select(s => Math.Max(s.CpuPowerWatts ?? 0, s.GpuPowerWatts ?? 0)).DefaultIfEmpty().Max());
+
+        _lanes =
+        [
+            new("CPU", "100%", [Build("Load", s => s.CpuPercent, 100, s => Percent(s.CpuPercent))], Regions(RecorderChannel.Cpu, RecorderChannel.CpuThermalThrottle)),
+            new("GPU", "100%", [Build("Load", s => s.GpuPercent, 100, s => Percent(s.GpuPercent))], Regions(RecorderChannel.Gpu, RecorderChannel.GpuThermalThrottle)),
+            new("Memory", "100%", [Build("Used", s => s.MemoryPercent, 100, s => Percent(s.MemoryPercent))], Regions(RecorderChannel.Memory)),
+            new("Temperature", IsFahrenheit ? "212°F" : "100°C",
+                [
+                    Build("CPU", s => s.CpuTemperatureC, 100, s => Temperature(s.CpuTemperatureC)),
+                    Build("GPU", s => s.GpuTemperatureC, 100, s => Temperature(s.GpuTemperatureC)),
+                ],
+                Regions(RecorderChannel.CpuTemperature, RecorderChannel.GpuTemperature)),
+            new("Power", Watts(powerMax),
+                [
+                    Build("CPU", s => s.CpuPowerWatts, powerMax, s => Watts(s.CpuPowerWatts)),
+                    Build("GPU", s => s.GpuPowerWatts, powerMax, s => Watts(s.GpuPowerWatts)),
+                ],
+                []),
+            new("Network", Rate(networkMax),
+                [
+                    Build("Down", s => s.DownloadBytesPerSec, networkMax, s => Rate(s.DownloadBytesPerSec)),
+                    Build("Up", s => s.UploadBytesPerSec, networkMax, s => Rate(s.UploadBytesPerSec)),
+                ],
+                []),
+        ];
+    }
+
+    private Trace Build(string label, Func<RecordedSample, double?> value, double max, Func<RecordedSample, string> format) =>
+        new(label, TracePath.Build(_samples, value, _start, Window, max), format);
+
+    private IReadOnlyList<(double X, double Width)> Regions(params RecorderChannel[] channels) =>
+        _events
+            .Where(e => channels.Contains(e.Channel))
+            .Select(e =>
+            {
+                var x = TracePath.Percent(e.Start, _start, Window) * 10;
+                return (x, Math.Max(TracePath.Percent(e.End, _start, Window) * 10 - x, 3));
+            })
+            .ToList();
+
+    private RecordedSample? SampleAt(DateTimeOffset time)
+    {
+        if (_samples.Count == 0)
+            return null;
+
+        int low = 0, high = _samples.Count - 1;
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (_samples[middle].Timestamp < time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        var nearest = _samples[low];
+        if (low > 0 && time - _samples[low - 1].Timestamp < nearest.Timestamp - time)
+            nearest = _samples[low - 1];
+
+        return (nearest.Timestamp - time).Duration() <= TracePath.GapBreak ? nearest : null;
+    }
+
+    private string Format(Trace trace) => ReadoutSample is { } sample ? trace.Format(sample) : "—";
+
+    private string Title(RecorderEvent e) => e.Channel switch
+    {
+        RecorderChannel.Cpu => $"CPU load {Percent(e.Peak)}",
+        RecorderChannel.Gpu => $"GPU load {Percent(e.Peak)}",
+        RecorderChannel.Memory => $"Memory {Percent(e.Peak)} used",
+        RecorderChannel.CpuTemperature => $"CPU hit {Temperature(e.Peak)}",
+        RecorderChannel.GpuTemperature => $"GPU hit {Temperature(e.Peak)}",
+        RecorderChannel.CpuThermalThrottle => "CPU thermal throttling",
+        _ => "GPU thermal throttling",
+    };
+
+    private static string Watts(double? watts) => watts is { } w ? $"{w:0} W" : "—";
+
+    private static string Culprits(RecorderEvent e) =>
+        e.Culprits.Count == 0
+            ? "No single process stood out"
+            : string.Join(" · ", e.Culprits.Select(c => $"{c.Name} {(e.Channel == RecorderChannel.Memory ? Memory((long)c.Value) : Percent(c.Value))}"));
+
+    private static string Percent(double value) => $"{value:0}%";
+
+    private string Temperature(double? celsius) =>
+        celsius is not { } c ? "—" : IsFahrenheit ? $"{c * 9 / 5 + 32:0}°F" : $"{c:0}°C";
+
+    private static string Rate(double bytesPerSec)
+    {
+        var (value, unit) = Units.Size(bytesPerSec, minUnit: 1);
+        return $"{value} {unit}/s";
+    }
+
+    private static string Memory(long bytes)
+    {
+        var (value, unit) = Units.Size(bytes, minUnit: 2);
+        return $"{value} {unit}";
+    }
+
+    private static string Clock(DateTimeOffset time) => time.ToString("T", CultureInfo.CurrentCulture);
+
+    private static string Duration(TimeSpan duration) =>
+        duration.TotalMinutes >= 1 ? $"{(int)duration.TotalMinutes} min {duration.Seconds} s" : $"{Math.Max(1, (int)duration.TotalSeconds)} s";
+
+    private static string Svg(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static string Css(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    public async ValueTask DisposeAsync()
+    {
+        Recorder.Recorded -= OnRecorded;
+
+        if (_selfReference is null)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("sysPulseScope.detach", _lanesElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or ObjectDisposedException or TaskCanceledException)
+        {
+            // The window is closing.
+        }
+
+        _selfReference.Dispose();
+    }
+}

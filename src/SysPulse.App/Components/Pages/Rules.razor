@@ -1,0 +1,373 @@
+@page "/rules"
+@using System.Diagnostics
+@implements IDisposable
+@inject ISettingsService SettingsService
+@inject IRuleEngine RuleEngine
+@inject IPowerProfileService Power
+@inject IMetricsSource MetricsSource
+@inject INotifier Notifier
+
+<div class="rules-page">
+    <header class="page-header">
+        <h1 class="page-title">Alerts &amp; Rules</h1>
+        <div class="page-actions">
+            @if (_testSent)
+            {
+                <span class="page-detail">Sent</span>
+            }
+            <button type="button" class="button secondary" @onclick="ResetRules" @onfocusout="() => _confirmReset = false">
+                @(_confirmReset ? "Confirm reset" : "Reset to defaults")
+            </button>
+            <button type="button" class="button secondary" @onclick="TestNotification">Test notification</button>
+            <button type="button" class="button" @onclick="AddRule" disabled="@(_settings.Rules.Count >= AppSettings.MaxRules)">Add rule</button>
+        </div>
+    </header>
+
+    @if (_notificationsUnavailable is { } reason)
+    {
+        <div class="notice">
+            <span>@reason</span>
+            <button type="button" class="button secondary" @onclick="OpenNotificationSettings">Open settings</button>
+        </div>
+    }
+    else if (_testSent)
+    {
+        <div class="notice">
+            <span>Test sent. If nothing appeared, Do Not Disturb is probably on (click the clock in the taskbar to check).</span>
+        </div>
+    }
+
+    <section class="card">
+        <div class="profile-row">
+            <div>
+                <h2 class="card-title">Profile</h2>
+                <p class="hint">@ProfileHint</p>
+            </div>
+            @if (Power.IsSupported)
+            {
+                <SegmentedControl TValue="PowerProfile?"
+                                  Options="ProfileOptions"
+                                  Value="_profile"
+                                  ValueChanged="@((PowerProfile? profile) => ApplyProfile(profile))" />
+            }
+        </div>
+        @if (_profileError is not null)
+        {
+            <p class="error-text">Couldn't change the power mode: @_profileError</p>
+        }
+    </section>
+
+    <section class="card">
+        <header class="card-header">
+            <h2 class="card-title">Rules</h2>
+            <span class="card-detail">@_settings.Rules.Count(r => r.Enabled) of @_settings.Rules.Count on</span>
+        </header>
+
+        @if (_settings.Rules.Count == 0)
+        {
+            <p class="hint empty">No rules yet. Add one to get notified when something runs hot, or to switch profiles when a game starts.</p>
+        }
+
+        <div class="rule-list">
+            @foreach (var rule in _settings.Rules)
+            {
+                var id = rule.Id;
+                var active = RuleEngine.IsActive(id);
+                <div class="rule @(rule.Enabled ? null : "disabled")" @key="id">
+                    <span class="rule-lamp @(active ? "on" : null)" title="@(active ? "Triggered now" : "Waiting")"></span>
+
+                    <div class="sentence">
+                        <span class="word">When</span>
+                        <select class="field" value="@TriggerKey(rule)" @onchange="e => SetTrigger(id, e.Value)">
+                            <option value="@nameof(RuleMetric.CpuLoad)">CPU load</option>
+                            <option value="@nameof(RuleMetric.GpuLoad)">GPU load</option>
+                            <option value="@nameof(RuleMetric.MemoryLoad)">memory use</option>
+                            <option value="@nameof(RuleMetric.CpuTemperature)">CPU temperature</option>
+                            <option value="@nameof(RuleMetric.GpuTemperature)">GPU temperature</option>
+                            <option value="@ProcessKey">the app</option>
+                        </select>
+
+                        @if (rule.Trigger == RuleTrigger.MetricAbove)
+                        {
+                            <span class="word">is above</span>
+                            <input class="field number" type="number" step="1"
+                                   value="@DisplayThreshold(rule)"
+                                   @onchange="e => SetThreshold(id, e.Value)" />
+                            <span class="word">@ThresholdUnit(rule)</span>
+                            <span class="word">for</span>
+                            <select class="field" value="@rule.DurationSeconds" @onchange="e => SetDuration(id, e.Value)">
+                                @foreach (var seconds in DurationChoices(rule.DurationSeconds))
+                                {
+                                    <option value="@seconds">@DurationLabel(seconds)</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input class="field text" list="process-names" placeholder="process name, e.g. Cyberpunk2077"
+                                   value="@rule.ProcessName"
+                                   @onchange="e => Change(id, r => r with { ProcessName = e.Value?.ToString() ?? string.Empty })" />
+                            <span class="word">is running</span>
+                        }
+
+                        <span class="then">
+                            <span class="arrow">→</span>
+                            <select class="field" value="@ActionKey(rule)" @onchange="e => SetAction(id, e.Value)">
+                                <option value="@NotifyKey">notify me</option>
+                                @foreach (var profile in Enum.GetValues<PowerProfile>())
+                                {
+                                    <option value="@profile" disabled="@(!Power.IsSupported)">switch to @profile</option>
+                                }
+                            </select>
+                        </span>
+                    </div>
+
+                    <ToggleSwitch Value="rule.Enabled" ValueChanged="@((bool on) => Change(id, r => r with { Enabled = on }))" />
+                    <button type="button" class="delete" title="Delete rule" @onclick="() => Delete(id)">
+                        <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+                    </button>
+                </div>
+            }
+        </div>
+
+        <datalist id="process-names">
+            @foreach (var name in _processNames)
+            {
+                <option value="@name"></option>
+            }
+        </datalist>
+
+        <p class="hint footnote">
+            Rules are checked at every refresh. Profile switches change back when the trigger ends, and each rule
+            notifies at most once every 5 minutes.
+        </p>
+    </section>
+
+    <section class="card">
+        <header class="card-header">
+            <h2 class="card-title">Activity</h2>
+            <span class="card-detail">Since SysPulse started</span>
+        </header>
+
+        @if (_activity.Count == 0)
+        {
+            <p class="hint empty">Nothing has triggered yet.</p>
+        }
+        else
+        {
+            <div class="activity-list">
+                @foreach (var entry in _activity)
+                {
+                    <div class="activity">
+                        <span class="activity-time readout">@entry.Timestamp.ToString("T", CultureInfo.CurrentCulture)</span>
+                        <span class="activity-message">@entry.Message</span>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private const string ProcessKey = "process";
+    private const string NotifyKey = "notify";
+    private static readonly int[] Durations = [5, 10, 30, 60, 120, 300];
+
+    private static readonly SegmentOption<PowerProfile?>[] ProfileOptions =
+    [
+        new(PowerProfile.Silent, "Silent"),
+        new(PowerProfile.Default, "Default"),
+        new(PowerProfile.Performance, "Performance"),
+    ];
+
+    private AppSettings _settings = new();
+    private IReadOnlyList<RuleActivity> _activity = [];
+    private IReadOnlyList<string> _processNames = [];
+    private PowerProfile? _profile;
+    private string? _profileError;
+    private string? _notificationsUnavailable;
+    private bool _testSent;
+    private bool _confirmReset;
+
+    private bool IsFahrenheit => _settings.TemperatureUnit == TemperatureUnit.Fahrenheit;
+
+    private string ProfileHint =>
+        !Power.IsSupported ? "Windows power modes aren't available on this PC, so profiles can't be switched."
+        : _profile is null ? "A custom power plan is active. Picking a profile switches to the Balanced plan and sets its power mode."
+        : "Sets the Windows power mode: Silent is best power efficiency, Default is balanced, Performance is best performance. Also in the title bar.";
+
+    protected override void OnInitialized()
+    {
+        Refresh();
+        SettingsService.Changed += OnSettingsChanged;
+        RuleEngine.ActivityChanged += OnActivityChanged;
+        Power.Changed += OnProfileChanged;
+    }
+
+    private void Refresh()
+    {
+        _settings = SettingsService.Current;
+        _activity = RuleEngine.RecentActivity;
+        _profile = ReadProfile();
+        _notificationsUnavailable = Notifier.UnavailableReason;
+        _processNames = MetricsSource.Current.Processes
+            .Select(p => p.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private PowerProfile? ReadProfile()
+    {
+        try
+        {
+            return Power.Current;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void OnSettingsChanged(AppSettings settings) => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
+
+    private void OnActivityChanged() => _ = InvokeAsync(() => { Refresh(); StateHasChanged(); });
+
+    private void OnProfileChanged(PowerProfile profile) => _ = InvokeAsync(() => { _profile = ReadProfile(); StateHasChanged(); });
+
+    private void ApplyProfile(PowerProfile? profile)
+    {
+        if (profile is not { } value)
+            return;
+
+        try
+        {
+            Power.Apply(value);
+            _profileError = null;
+        }
+        catch (Exception ex)
+        {
+            _profileError = ex.Message;
+        }
+
+        _profile = ReadProfile();
+    }
+
+    private void TestNotification()
+    {
+        Notifier.Notify("SysPulse", "Notifications are working. Rules will alert you like this.");
+        _notificationsUnavailable = Notifier.UnavailableReason; // Re-check in case it was just switched on.
+        _testSent = true;
+    }
+
+    private void OpenNotificationSettings()
+    {
+        Process.Start(new ProcessStartInfo("ms-settings:notifications") { UseShellExecute = true })?.Dispose();
+    }
+
+    private void AddRule() =>
+        UpdateRules(rules => [.. rules, new AlertRule { Metric = RuleMetric.CpuLoad, Threshold = 90, DurationSeconds = 60 }]);
+
+    // Two clicks, so a stray click can't wipe custom rules.
+    private void ResetRules()
+    {
+        if (!_confirmReset)
+        {
+            _confirmReset = true;
+            return;
+        }
+
+        _confirmReset = false;
+        UpdateRules(_ => AlertRule.Defaults);
+    }
+
+    private void Delete(Guid id) => UpdateRules(rules => rules.Where(r => r.Id != id).ToArray());
+
+    private void Change(Guid id, Func<AlertRule, AlertRule> change) =>
+        UpdateRules(rules => rules.Select(r => r.Id == id ? change(r) : r).ToArray());
+
+    private void UpdateRules(Func<IReadOnlyList<AlertRule>, IReadOnlyList<AlertRule>> change)
+    {
+        SettingsService.Update(s => s with { Rules = change(s.Rules) });
+        _settings = SettingsService.Current;
+    }
+
+    private static string TriggerKey(AlertRule rule) =>
+        rule.Trigger == RuleTrigger.ProcessRunning ? ProcessKey : rule.Metric.ToString();
+
+    private void SetTrigger(Guid id, object? value)
+    {
+        if (value?.ToString() == ProcessKey)
+        {
+            Change(id, r => r with { Trigger = RuleTrigger.ProcessRunning });
+            return;
+        }
+
+        if (!Enum.TryParse<RuleMetric>(value?.ToString(), out var metric))
+            return;
+
+        // Moving between a load and a temperature puts the threshold somewhere sensible for the new kind.
+        Change(id, r => r with
+        {
+            Trigger = RuleTrigger.MetricAbove,
+            Metric = metric,
+            Threshold = AlertRule.IsTemperature(metric) == AlertRule.IsTemperature(r.Metric) ? r.Threshold
+                : AlertRule.IsTemperature(metric) ? 85 : 90,
+        });
+    }
+
+    private string DisplayThreshold(AlertRule rule)
+    {
+        var value = AlertRule.IsTemperature(rule.Metric) && IsFahrenheit ? rule.Threshold * 9 / 5 + 32 : rule.Threshold;
+        return Math.Round(value).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private string ThresholdUnit(AlertRule rule) =>
+        !AlertRule.IsTemperature(rule.Metric) ? "%" : IsFahrenheit ? "°F" : "°C";
+
+    private void SetThreshold(Guid id, object? value)
+    {
+        // Number inputs always report an invariant-format value.
+        if (!double.TryParse(value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+        {
+            StateHasChanged(); // Put the stored value back.
+            return;
+        }
+
+        Change(id, r => r with
+        {
+            Threshold = AlertRule.IsTemperature(r.Metric) && IsFahrenheit ? (number - 32) * 5 / 9 : number,
+        });
+    }
+
+    private void SetDuration(Guid id, object? value)
+    {
+        if (int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var seconds))
+            Change(id, r => r with { DurationSeconds = seconds });
+    }
+
+    // Keep a hand-edited duration selectable even if it isn't one of the presets.
+    private static IEnumerable<int> DurationChoices(int current) =>
+        Durations.Contains(current) ? Durations : Durations.Append(current).Order();
+
+    private static string DurationLabel(int seconds) =>
+        seconds == 0 ? "any time" : seconds >= 60 && seconds % 60 == 0 ? $"{seconds / 60} min" : $"{seconds} s";
+
+    private static string ActionKey(AlertRule rule) =>
+        rule.Action == RuleAction.Notify ? NotifyKey : rule.Profile.ToString();
+
+    private void SetAction(Guid id, object? value)
+    {
+        if (value?.ToString() == NotifyKey)
+            Change(id, r => r with { Action = RuleAction.Notify });
+        else if (Enum.TryParse<PowerProfile>(value?.ToString(), out var profile))
+            Change(id, r => r with { Action = RuleAction.SwitchProfile, Profile = profile });
+    }
+
+    public void Dispose()
+    {
+        SettingsService.Changed -= OnSettingsChanged;
+        RuleEngine.ActivityChanged -= OnActivityChanged;
+        Power.Changed -= OnProfileChanged;
+    }
+}

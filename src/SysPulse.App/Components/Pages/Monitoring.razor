@@ -1,6 +1,7 @@
 @page "/"
 @implements IDisposable
 @inject IMetricsSource MetricsSource
+@inject IFlightRecorder Recorder
 @inject ISettingsService SettingsService
 
 <div class="dashboard">
@@ -10,8 +11,10 @@
     }
 
     <div class="row hardware">
-        <HardwareCard Title="CPU" Metrics="_snapshot.Cpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="5000" FanFloorRpm="2500" />
-        <HardwareCard Title="GPU" Metrics="_snapshot.Gpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="2500" FanFloorRpm="3000" />
+        <HardwareCard Title="CPU" Metrics="_snapshot.Cpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="5000" PowerFloorWatts="65" FanFloorRpm="2500"
+                      History="_history" HistoryValue="CpuHistory" />
+        <HardwareCard Title="GPU" Metrics="_snapshot.Gpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="2500" PowerFloorWatts="100" FanFloorRpm="3000"
+                      History="_history" HistoryValue="GpuHistory" />
     </div>
 
     <div class="row system">
@@ -23,8 +26,9 @@
             <div class="center">
                 <Gauge Value="_snapshot.Memory.LoadPercent" Size="112" />
             </div>
-            <footer class="card-footer">
+            <footer class="card-footer footer-row">
                 <LoadStatus Percent="_snapshot.Memory.LoadPercent" />
+                <Sparkline Samples="_history" Value="MemoryHistory" Max="100" />
             </footer>
         </section>
 
@@ -46,8 +50,9 @@
                     <span class="readout">@downValue<span class="unit">@downUnit/s</span></span>
                 </div>
             </div>
-            <footer class="card-footer">
+            <footer class="card-footer footer-row">
                 <LoadStatus Percent="NetworkLoadPercent" />
+                <Sparkline Samples="_history" Value="DownloadHistory" SecondaryValue="UploadHistory" />
             </footer>
         </section>
 
@@ -62,8 +67,9 @@
             @{
                 var (freeValue, freeUnit) = Units.Size(_snapshot.Storage.TotalBytes - _snapshot.Storage.UsedBytes, minUnit: 3);
             }
-            <footer class="card-footer footer-text">
-                Free<span class="readout">@freeValue<span class="unit">@freeUnit</span></span>
+            <footer class="card-footer footer-row">
+                <span class="footer-text">Free<span class="readout">@freeValue<span class="unit">@freeUnit</span></span></span>
+                <Sparkline Samples="_history" Value="DiskHistory" Max="100" Label="Disk activity" />
             </footer>
         </section>
     </div>
@@ -75,7 +81,16 @@
     // The network card's load status treats a 100 Mbps link as "full".
     private const double NetworkReferenceBytesPerSec = 100_000_000 / 8.0;
 
+    private static readonly TimeSpan HistoryWindow = TimeSpan.FromMinutes(2);
+    private static readonly Func<RecordedSample, double?> CpuHistory = s => s.CpuPercent;
+    private static readonly Func<RecordedSample, double?> GpuHistory = s => s.GpuPercent;
+    private static readonly Func<RecordedSample, double?> MemoryHistory = s => s.MemoryPercent;
+    private static readonly Func<RecordedSample, double?> DownloadHistory = s => s.DownloadBytesPerSec;
+    private static readonly Func<RecordedSample, double?> UploadHistory = s => s.UploadBytesPerSec;
+    private static readonly Func<RecordedSample, double?> DiskHistory = s => s.DiskActivePercent;
+
     private SystemSnapshot _snapshot = SystemSnapshot.Empty;
+    private IReadOnlyList<RecordedSample> _history = [];
 
     private AppSettings Settings => SettingsService.Current;
 
@@ -91,15 +106,18 @@
     protected override void OnInitialized()
     {
         _snapshot = MetricsSource.Current;
-        MetricsSource.Updated += OnMetricsUpdated;
+        _history = Recorder.GetSamples(HistoryWindow);
+        Recorder.Recorded += OnRecorded;
     }
 
-    private void OnMetricsUpdated(SystemSnapshot snapshot) =>
+    // The recorder publishes right after each metrics sample, so the snapshot and its history stay in step.
+    private void OnRecorded(RecordedSample sample) =>
         _ = InvokeAsync(() =>
         {
-            _snapshot = snapshot;
+            _snapshot = MetricsSource.Current;
+            _history = Recorder.GetSamples(HistoryWindow);
             StateHasChanged();
         });
 
-    public void Dispose() => MetricsSource.Updated -= OnMetricsUpdated;
+    public void Dispose() => Recorder.Recorded -= OnRecorded;
 }

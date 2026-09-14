@@ -4,17 +4,44 @@
     gap: 12px;
 }
 
+/* Grows so the footer sits at the bottom, lining up with the card beside it. */
 .body {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 28px;
     padding: 2px 4px 0;
+}
+
+.footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .bars {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 14px;
+    gap: 9px;
     min-width: 0;
+}
+
+.throttle {
+    padding: 1px 6px;
+    color: var(--warn);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid rgba(240, 163, 58, 0.35);
+    border-radius: 3px;
+}
+
+.throttle.thermal {
+    color: var(--danger);
+    border-color: rgba(229, 88, 74, 0.45);
+    box-shadow: 0 0 8px rgba(229, 88, 74, 0.25);
 }

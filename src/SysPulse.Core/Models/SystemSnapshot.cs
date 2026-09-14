@@ -25,9 +25,32 @@ public sealed record SystemSnapshot(
 }
 
 /// <summary>CPU or GPU readings. Sensor values are null when the hardware or driver doesn't expose them.</summary>
-public sealed record DeviceMetrics(string? Name, double LoadPercent, double? TemperatureC, double? ClockMhz, double? FanRpm)
+/// <param name="Throttle">Null when SysPulse can't tell whether the device is throttling.</param>
+public sealed record DeviceMetrics(
+    string? Name,
+    double LoadPercent,
+    double? TemperatureC,
+    double? ClockMhz,
+    double? FanRpm,
+    double? PowerWatts = null,
+    ThrottleReason? Throttle = null)
 {
     public static DeviceMetrics Empty { get; } = new(null, 0, null, null, null);
+}
+
+/// <summary>Why a CPU or GPU is running below full speed while busy.</summary>
+public enum ThrottleReason
+{
+    None,
+
+    /// <summary>Slowing down to cool off.</summary>
+    Thermal,
+
+    /// <summary>Held at its power limit. Normal under sustained heavy load, especially on laptops.</summary>
+    Power,
+
+    /// <summary>Capped for another reason: power plan, battery saver, or firmware.</summary>
+    Limited,
 }
 
 public sealed record MemoryMetrics(long TotalBytes, long UsedBytes)
@@ -35,7 +58,8 @@ public sealed record MemoryMetrics(long TotalBytes, long UsedBytes)
     public double LoadPercent => TotalBytes == 0 ? 0 : 100.0 * UsedBytes / TotalBytes;
 }
 
-public sealed record StorageMetrics(long TotalBytes, long UsedBytes)
+/// <param name="ActivePercent">How busy the busiest physical disk is (like Task Manager's "Active time"), or null if unavailable.</param>
+public sealed record StorageMetrics(long TotalBytes, long UsedBytes, double? ActivePercent = null)
 {
     public double LoadPercent => TotalBytes == 0 ? 0 : 100.0 * UsedBytes / TotalBytes;
 }

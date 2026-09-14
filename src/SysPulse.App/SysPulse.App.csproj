@@ -7,9 +7,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- Only for the tray icon (NotifyIcon); see the Using removals below. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>SysPulse.App</RootNamespace>
     <AssemblyName>SysPulse</AssemblyName>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Regenerate with tools/New-AppIcon.ps1. -->
     <ApplicationIcon>Assets\SysPulse.ico</ApplicationIcon>
@@ -19,6 +21,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SysPulse.Core\SysPulse.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinForms' implicit usings clash with WPF types (Application, MessageBox, Color...). Refer to them explicitly instead. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
   <ItemGroup>

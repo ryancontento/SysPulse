@@ -1,0 +1,158 @@
+@page "/check"
+@inject IFlightRecorder Recorder
+@inject IMetricsSource MetricsSource
+@inject IPowerProfileService Power
+@inject ISettingsService SettingsService
+@inject NavigationManager Navigation
+
+<div class="checkup">
+    <header class="page-header">
+        <div class="title-group">
+            <h1 class="page-title">Why is my PC slow?</h1>
+            @if (_report is not null)
+            {
+                <span class="page-detail">Checked @_report.CheckedAt.ToString("T", CultureInfo.CurrentCulture)</span>
+            }
+        </div>
+        <div class="page-actions">
+            <SegmentedControl TValue="int" Options="WindowOptions" Value="_minutes" ValueChanged="SetWindow" />
+            <button type="button" class="button" @onclick="Run">Check again</button>
+        </div>
+    </header>
+
+    @if (_report is { } report)
+    {
+        <section class="card summary @Severity(Worst)">
+            <span class="lamp"></span>
+            <div class="body">
+                <h2 class="summary-title">@Headline(report)</h2>
+                <p>@report.Summary</p>
+            </div>
+        </section>
+
+        @foreach (var finding in report.Findings)
+        {
+            <section class="card finding @Severity(finding.Severity)">
+                <span class="lamp"></span>
+                <div class="body">
+                    <div class="finding-head">
+                        <h3 class="finding-title">@finding.Title</h3>
+                        <span class="severity">@SeverityLabel(finding.Severity)</span>
+                    </div>
+                    <p>@finding.Detail</p>
+
+                    @if (finding.Action == FindingAction.SwitchToPerformance && Power.IsSupported)
+                    {
+                        <div class="finding-actions">
+                            <button type="button" class="button secondary" @onclick="SwitchToPerformance">Switch to Performance</button>
+                        </div>
+                    }
+                    else if (finding.Action == FindingAction.OpenRecorder)
+                    {
+                        <div class="finding-actions">
+                            <button type="button" class="button secondary" @onclick="@(() => Navigation.NavigateTo("recorder"))">Open Flight Recorder</button>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (_actionError is not null)
+        {
+            <p class="error-text">Couldn't switch profiles: @_actionError</p>
+        }
+
+        <p class="footnote">
+            Based on what the Flight Recorder saw. SysPulse can't see inside apps, so a slow website, game, or internet
+            connection won't show up here.
+        </p>
+    }
+</div>
+
+@code {
+    private static readonly SegmentOption<int>[] WindowOptions = [new(2, "2 min"), new(5, "5 min"), new(15, "15 min")];
+
+    private int _minutes = 5;
+    private SlowdownReport? _report;
+    private string? _actionError;
+
+    private FindingSeverity? Worst =>
+        _report is not { HasEnoughData: true } report ? null
+        : report.Findings.Select(f => (FindingSeverity?)f.Severity).DefaultIfEmpty(FindingSeverity.Info).Max();
+
+    protected override void OnInitialized() => Run();
+
+    private void SetWindow(int minutes)
+    {
+        _minutes = minutes;
+        Run();
+    }
+
+    private void Run()
+    {
+        _actionError = null;
+        _report = SlowdownAnalyzer.Analyze(
+            Recorder.GetSamples(TimeSpan.FromMinutes(_minutes)),
+            MetricsSource.Current,
+            CurrentProfile(),
+            SettingsService.Current.TemperatureUnit,
+            TimeSpan.FromMinutes(_minutes));
+    }
+
+    private PowerProfile? CurrentProfile()
+    {
+        try
+        {
+            return Power.IsSupported ? Power.Current : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void SwitchToPerformance()
+    {
+        try
+        {
+            Power.Apply(PowerProfile.Performance);
+            Run();
+        }
+        catch (Exception ex)
+        {
+            _actionError = ex.Message;
+        }
+    }
+
+    private static string Headline(SlowdownReport report)
+    {
+        if (!report.HasEnoughData)
+            return "Not enough history yet";
+
+        var problems = report.Findings.Count(f => f.Severity == FindingSeverity.Problem);
+        var warnings = report.Findings.Count(f => f.Severity == FindingSeverity.Warning);
+
+        return problems switch
+        {
+            1 => "Found a likely cause",
+            > 1 => $"Found {problems} likely causes",
+            _ when warnings > 0 => "Nothing serious, but worth a look",
+            _ => "Nothing looks wrong",
+        };
+    }
+
+    private static string? Severity(FindingSeverity? severity) => severity switch
+    {
+        FindingSeverity.Problem => "problem",
+        FindingSeverity.Warning => "warning",
+        FindingSeverity.Info => "info",
+        _ => null,
+    };
+
+    private static string SeverityLabel(FindingSeverity severity) => severity switch
+    {
+        FindingSeverity.Problem => "Likely cause",
+        FindingSeverity.Warning => "Worth a look",
+        _ => "FYI",
+    };
+}

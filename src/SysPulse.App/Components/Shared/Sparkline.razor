@@ -1,0 +1,38 @@
+<div class="sparkline" title="@(Label is null ? null : Label + ", ")last @((int)Window.TotalMinutes) minutes">
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none">
+        @if (_secondaryPath is not null)
+        {
+            <path class="line secondary" d="@_secondaryPath" />
+        }
+        <path class="line" d="@_path" />
+    </svg>
+</div>
+
+@code {
+    private string _path = "";
+    private string? _secondaryPath;
+
+    [Parameter, EditorRequired] public IReadOnlyList<RecordedSample> Samples { get; set; } = [];
+
+    [Parameter, EditorRequired] public Func<RecordedSample, double?> Value { get; set; } = _ => null;
+
+    /// <summary>Optional second, dimmer trace sharing the same scale (e.g. upload under download).</summary>
+    [Parameter] public Func<RecordedSample, double?>? SecondaryValue { get; set; }
+
+    /// <summary>Value at the top of the graph. When null, scales to the highest value shown.</summary>
+    [Parameter] public double? Max { get; set; }
+
+    [Parameter] public TimeSpan Window { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>What the trace shows, for the tooltip.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        var start = DateTimeOffset.Now - Window;
+        var max = Max ?? Math.Max(1, Samples.Select(s => Math.Max(Value(s) ?? 0, SecondaryValue?.Invoke(s) ?? 0)).DefaultIfEmpty().Max());
+
+        _path = TracePath.Build(Samples, Value, start, Window, max);
+        _secondaryPath = SecondaryValue is null ? null : TracePath.Build(Samples, SecondaryValue, start, Window, max);
+    }
+}

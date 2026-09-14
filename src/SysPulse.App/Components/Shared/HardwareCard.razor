@@ -9,18 +9,33 @@
         <div class="bars">
             <MetricBar Label="Temperature" Value="Temperature" Unit="@TemperatureSymbol" Min="@TemperatureScale.Min" Max="@TemperatureScale.Max" />
             <MetricBar Label="Clock" Value="Metrics.ClockMhz" Unit="MHz" Max="_clockMax" />
+            <MetricBar Label="Power" Value="Metrics.PowerWatts" Unit="W" Max="_powerMax" />
             <MetricBar Label="Fan" Value="Metrics.FanRpm" Unit="RPM" Max="_fanMax" />
         </div>
     </div>
 
-    <footer class="card-footer">
+    <footer class="card-footer footer-row">
         <LoadStatus Percent="Metrics.LoadPercent" />
+        @if (Metrics.Throttle is { } throttle && throttle != ThrottleReason.None)
+        {
+            <span class="throttle @(throttle == ThrottleReason.Thermal ? "thermal" : null)" title="@ThrottleHint(throttle)">@ThrottleLabel(throttle)</span>
+        }
+        @if (HistoryValue is not null)
+        {
+            <Sparkline Samples="History" Value="HistoryValue" Max="100" />
+        }
     </footer>
 </section>
 
 @code {
     private double _clockMax;
     private double _fanMax;
+    private double _powerMax;
+
+    [Parameter] public IReadOnlyList<RecordedSample> History { get; set; } = [];
+
+    /// <summary>Picks this card's load out of a recorded sample; the footer sparkline is hidden when null.</summary>
+    [Parameter] public Func<RecordedSample, double?>? HistoryValue { get; set; }
 
     [Parameter, EditorRequired] public string Title { get; set; } = "";
 
@@ -28,8 +43,10 @@
 
     [Parameter] public TemperatureUnit TemperatureUnit { get; set; }
 
-    // Clock and fan meters scale against the highest value seen this session, but never below these floors.
+    // Clock, power, and fan meters scale against the highest value seen this session, but never below these floors.
     [Parameter] public double ClockFloorMhz { get; set; } = 5000;
+
+    [Parameter] public double PowerFloorWatts { get; set; } = 65;
 
     [Parameter] public double FanFloorRpm { get; set; } = 2500;
 
@@ -45,6 +62,21 @@
     protected override void OnParametersSet()
     {
         _clockMax = Math.Max(Math.Max(_clockMax, ClockFloorMhz), Metrics.ClockMhz ?? 0);
+        _powerMax = Math.Max(Math.Max(_powerMax, PowerFloorWatts), Metrics.PowerWatts ?? 0);
         _fanMax = Math.Max(Math.Max(_fanMax, FanFloorRpm), Metrics.FanRpm ?? 0);
     }
+
+    private static string ThrottleLabel(ThrottleReason reason) => reason switch
+    {
+        ThrottleReason.Thermal => "Thermal throttling",
+        ThrottleReason.Power => "Power limited",
+        _ => "Speed limited",
+    };
+
+    private static string ThrottleHint(ThrottleReason reason) => reason switch
+    {
+        ThrottleReason.Thermal => "Hot enough that it's slowing itself down to cool off. Check cooling and airflow.",
+        ThrottleReason.Power => "Running at its power limit. Normal under sustained heavy load, especially on laptops.",
+        _ => "Running below full speed because of the power plan, battery saver, or a firmware limit.",
+    };
 }
