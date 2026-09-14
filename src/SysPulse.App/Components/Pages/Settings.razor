@@ -1,3 +1,155 @@
 @page "/settings"
+@using System.Diagnostics
+@using System.Reflection
+@inject ISettingsService SettingsService
 
-<ComingSoon Title="Settings" />
+<div class="settings">
+    <header class="page-header">
+        <h1 class="page-title">Settings</h1>
+        <span class="page-detail">Changes save automatically</span>
+    </header>
+
+    <section class="card">
+        <h2 class="card-title">Display</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Temperature unit</div>
+                <div class="setting-hint">Used on the CPU and GPU cards.</div>
+            </div>
+            <SegmentedControl TValue="TemperatureUnit"
+                              Options="TemperatureOptions"
+                              Value="_settings.TemperatureUnit"
+                              ValueChanged="@((TemperatureUnit unit) => Update(s => s with { TemperatureUnit = unit }))" />
+        </div>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Accent</div>
+                <div class="setting-hint">Color for gauges, meters, lamps, and highlights.</div>
+            </div>
+            <div class="swatches" role="radiogroup">
+                @foreach (var accent in Accents)
+                {
+                    var selected = accent.Value == _settings.Accent;
+                    <button type="button"
+                            role="radio"
+                            aria-checked="@(selected ? "true" : "false")"
+                            class="swatch @(selected ? "selected" : null)"
+                            data-accent="@AccentPalette.CssName(accent.Value)"
+                            @onclick="() => Update(s => s with { Accent = accent.Value })">
+                        <span class="swatch-lamp"></span>@accent.Label
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">Monitoring</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Refresh rate</div>
+                <div class="setting-hint">How often readings update. Faster costs a little more CPU.</div>
+            </div>
+            <SegmentedControl TValue="double"
+                              Options="IntervalOptions"
+                              Value="_settings.PollingIntervalSeconds"
+                              ValueChanged="@((double seconds) => Update(s => s with { PollingIntervalSeconds = seconds }))" />
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">Processes</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Group by name</div>
+                <div class="setting-hint">Combine processes that share a name, like Task Manager does.</div>
+            </div>
+            <ToggleSwitch Value="_settings.GroupProcesses"
+                          ValueChanged="@((bool group) => Update(s => s with { GroupProcesses = group }))" />
+        </div>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">Rows shown</div>
+                <div class="setting-hint">Maximum rows in the dashboard's process table.</div>
+            </div>
+            <SegmentedControl TValue="int"
+                              Options="RowOptions"
+                              Value="_settings.ProcessRows"
+                              ValueChanged="@((int rows) => Update(s => s with { ProcessRows = rows }))" />
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">About</h2>
+
+        <div class="setting">
+            <div class="setting-text">
+                <div class="setting-name">SysPulse @Version</div>
+                <div class="setting-hint path" title="@JsonSettingsService.SettingsPath">@JsonSettingsService.SettingsPath</div>
+            </div>
+            <div class="actions">
+                <button type="button" class="button secondary" @onclick="OpenSettingsFolder">Open folder</button>
+                <button type="button" class="button secondary" @onclick="ResetToDefaults">Reset to defaults</button>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly SegmentOption<TemperatureUnit>[] TemperatureOptions =
+    [
+        new(TemperatureUnit.Celsius, "°C"),
+        new(TemperatureUnit.Fahrenheit, "°F"),
+    ];
+
+    private static readonly SegmentOption<double>[] IntervalOptions =
+    [
+        new(0.5, "0.5 s"),
+        new(1, "1 s"),
+        new(2, "2 s"),
+        new(5, "5 s"),
+    ];
+
+    private static readonly SegmentOption<int>[] RowOptions =
+    [
+        new(25, "25"),
+        new(50, "50"),
+        new(100, "100"),
+    ];
+
+    private static readonly (AccentTheme Value, string Label)[] Accents =
+    [
+        (AccentTheme.Amber, "Amber"),
+        (AccentTheme.Phosphor, "Phosphor"),
+        (AccentTheme.Arctic, "Arctic"),
+    ];
+
+    // InformationalVersion carries a "+commit" suffix; show just the version.
+    private static readonly string Version =
+        (typeof(AccentPalette).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev")
+        .Split('+')[0];
+
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized() => _settings = SettingsService.Current;
+
+    private void Update(Func<AppSettings, AppSettings> change)
+    {
+        SettingsService.Update(change);
+        _settings = SettingsService.Current;
+    }
+
+    private void ResetToDefaults() => Update(_ => new AppSettings());
+
+    private static void OpenSettingsFolder()
+    {
+        var folder = System.IO.Path.GetDirectoryName(JsonSettingsService.SettingsPath)!;
+        System.IO.Directory.CreateDirectory(folder);
+        Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+    }
+}

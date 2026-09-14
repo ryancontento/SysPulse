@@ -1,0 +1,30 @@
+<section class="card spec-card">
+    <header class="card-header">
+        <h2 class="card-title">@Title</h2>
+        @if (Detail is not null)
+        {
+            <span class="card-detail">@Detail</span>
+        }
+    </header>
+
+    @if (Headline is not null)
+    {
+        <div class="headline" title="@Headline">@Headline</div>
+    }
+
+    <dl class="rows">
+        @ChildContent
+    </dl>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>The main name for the card, e.g. the CPU model.</summary>
+    [Parameter] public string? Headline { get; set; }
+
+    /// <summary>Small text on the right of the title, e.g. "2 adapters".</summary>
+    [Parameter] public string? Detail { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

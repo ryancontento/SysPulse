@@ -1,3 +1,257 @@
 @page "/specs"
+@using System.Text
+@inject IHardwareSpecsProvider SpecsProvider
 
-<ComingSoon Title="System Specs" />
+<div class="specs">
+    <header class="page-header">
+        <h1 class="page-title">System Specs</h1>
+        <div class="page-actions">
+            @if (_status is not null)
+            {
+                <span class="page-detail">@_status</span>
+            }
+            <button type="button" class="button secondary" disabled="@_loading" @onclick="RefreshAsync">Refresh</button>
+            <button type="button" class="button" disabled="@(_specs is null)" @onclick="CopySpecs">Copy specs</button>
+        </div>
+    </header>
+
+    @if (_specs is not { } specs)
+    {
+        <section class="card placeholder">
+            @if (_loading)
+            {
+                <span class="lamp"></span>
+                <span>Reading hardware details…</span>
+            }
+            else
+            {
+                <span>Couldn't read system specs. Try Refresh.</span>
+            }
+        </section>
+    }
+    else
+    {
+        <div class="grid">
+            <SpecCard Title="Processor" Headline="@specs.Cpu?.Name">
+                @if (specs.Cpu is { } cpu)
+                {
+                    <SpecRow Label="Cores" Value="@Count(cpu.Cores)" />
+                    <SpecRow Label="Threads" Value="@Count(cpu.Threads)" />
+                    <SpecRow Label="Base speed" Value="@Mhz(cpu.BaseClockMhz)" />
+                    <SpecRow Label="Socket" Value="@cpu.Socket" />
+                    <SpecRow Label="L2 cache" Value="@Bytes(cpu.L2CacheBytes, minUnit: 2)" />
+                    <SpecRow Label="L3 cache" Value="@Bytes(cpu.L3CacheBytes, minUnit: 2)" />
+                }
+            </SpecCard>
+
+            <SpecCard Title="Graphics" Detail="@Plural(specs.Gpus.Count, "adapter")">
+                @foreach (var gpu in specs.Gpus)
+                {
+                    <SpecHeading Text="@gpu.Name" />
+                    <SpecRow Label="Memory" Value="@GpuMemory(gpu)" />
+                    <SpecRow Label="Driver" Value="@gpu.DriverVersion" />
+                    <SpecRow Label="Display" Value="@gpu.Resolution" />
+                }
+            </SpecCard>
+
+            <SpecCard Title="Memory" Headline="@MemoryHeadline(specs.Memory)" Detail="@Plural(specs.Memory?.Modules.Count ?? 0, "module")">
+                @if (specs.Memory is { } memory)
+                {
+                    var firstModule = memory.Modules.FirstOrDefault();
+                    <SpecRow Label="Speed" Value="@MemorySpeed(firstModule?.SpeedMts)" />
+                    <SpecRow Label="Form factor" Value="@firstModule?.FormFactor" />
+                    @for (var i = 0; i < memory.Modules.Count; i++)
+                    {
+                        var module = memory.Modules[i];
+                        @* Slot names like "Controller0-ChannelA/B-DIMM0" are too long to scan; number the rows and keep the slot as a tooltip. *@
+                        <SpecRow Label="@($"Module {i + 1}")"
+                                 Value="@Join(" · ", Bytes(module.CapacityBytes, minUnit: 3), module.Manufacturer, module.PartNumber)"
+                                 Tooltip="@module.Slot" />
+                    }
+                }
+            </SpecCard>
+
+            <SpecCard Title="System" Headline="@MachineHeadline(specs.Machine)">
+                @if (specs.Machine is { } machine)
+                {
+                    <SpecRow Label="Manufacturer" Value="@machine.SystemManufacturer" />
+                    <SpecRow Label="Model" Value="@machine.SystemModel" />
+                    <SpecRow Label="Motherboard" Value="@Join(" ", machine.BoardManufacturer, machine.BoardProduct)" />
+                    <SpecRow Label="BIOS" Value="@Join(" ", machine.BiosVendor, machine.BiosVersion)" />
+                    <SpecRow Label="BIOS date" Value="@Date(machine.BiosDate)" />
+                }
+            </SpecCard>
+
+            <SpecCard Title="Operating System" Headline="@specs.Os?.Name">
+                @if (specs.Os is { } os)
+                {
+                    <SpecRow Label="Version" Value="@os.DisplayVersion" />
+                    <SpecRow Label="Build" Value="@os.Build" />
+                    <SpecRow Label="Architecture" Value="@os.Architecture" />
+                    <SpecRow Label="Installed" Value="@Date(os.InstallDate)" />
+                    <SpecRow Label="Uptime" Value="@Uptime(os.LastBoot)" Tooltip="@(os.LastBoot is { } boot ? $"Last boot {boot:g}" : null)" />
+                }
+            </SpecCard>
+
+            <SpecCard Title="Storage" Detail="@StorageTotal(specs.Disks)">
+                @foreach (var disk in specs.Disks)
+                {
+                    <SpecRow Label="@disk.Model" Value="@Join(" · ", Bytes(disk.SizeBytes, minUnit: 3), Join(" ", disk.BusType, disk.MediaType), disk.Health)" />
+                }
+            </SpecCard>
+
+            <SpecCard Title="Network" Detail="@Plural(specs.NetworkAdapters.Count, "adapter")">
+                @foreach (var adapter in specs.NetworkAdapters)
+                {
+                    <SpecRow Label="@adapter.Name" Value="@Join(" · ", LinkSpeed(adapter.SpeedBitsPerSecond), adapter.IPv4)" Tooltip="@adapter.Description" />
+                }
+            </SpecCard>
+        </div>
+    }
+</div>
+
+@code {
+    private HardwareSpecs? _specs;
+    private bool _loading;
+    private string? _status;
+
+    protected override Task OnInitializedAsync() => LoadAsync(refresh: false);
+
+    private Task RefreshAsync() => LoadAsync(refresh: true);
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _status = refresh ? "Refreshing…" : null;
+
+        try
+        {
+            _specs = await SpecsProvider.GetAsync(refresh);
+            _status = null;
+        }
+        catch (Exception)
+        {
+            _status = "Couldn't read system specs";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void CopySpecs()
+    {
+        if (_specs is null)
+            return;
+
+        try
+        {
+            System.Windows.Clipboard.SetText(FormatForSharing(_specs));
+            _status = "Copied to clipboard";
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            _status = "Couldn't access the clipboard";
+        }
+    }
+
+    /// <summary>Plain-text summary for forum posts and support tickets. Leaves out IP addresses on purpose.</summary>
+    private static string FormatForSharing(HardwareSpecs specs)
+    {
+        var text = new StringBuilder();
+
+        void Line(string label, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                text.AppendLine($"{label}: {value}");
+        }
+
+        if (specs.Cpu is { } cpu)
+            Line("CPU", Join(" ", cpu.Name, cpu.Cores > 0 ? $"({cpu.Cores} cores / {cpu.Threads} threads)" : null));
+
+        foreach (var gpu in specs.Gpus)
+            Line("GPU", Join(" ", gpu.Name, gpu.DedicatedMemoryBytes is { } vram ? $"({Bytes(vram, minUnit: 3)})" : null));
+
+        if (specs.Memory is { } memory)
+        {
+            var speed = MemorySpeed(memory.Modules.FirstOrDefault()?.SpeedMts);
+            var modules = memory.Modules.Count == 0 ? null : $"({Join(" @ ", Plural(memory.Modules.Count, "module"), speed)})";
+            Line("Memory", Join(" ", MemoryHeadline(memory), modules));
+        }
+
+        if (specs.Machine is { } machine)
+        {
+            Line("System", MachineHeadline(machine));
+            Line("Motherboard", Join(" ", machine.BoardManufacturer, machine.BoardProduct));
+            Line("BIOS", Join(" ", machine.BiosVendor, machine.BiosVersion));
+        }
+
+        if (specs.Os is { } os)
+            Line("OS", Join(" ", os.Name, os.DisplayVersion, $"(build {os.Build})", os.Architecture));
+
+        foreach (var disk in specs.Disks)
+            Line("Storage", Join(" ", disk.Model, Bytes(disk.SizeBytes, minUnit: 3), disk.BusType, disk.MediaType));
+
+        return text.ToString().TrimEnd();
+    }
+
+    private static string? Count(int value) => value > 0 ? value.ToString("N0", CultureInfo.CurrentCulture) : null;
+
+    private static string? Mhz(int? mhz) => mhz is > 0 ? $"{mhz.Value:N0} MHz" : null;
+
+    private static string? MemorySpeed(int? mts) => mts is > 0 ? $"{mts.Value:N0} MT/s" : null;
+
+    private static string? Bytes(long? bytes, int minUnit)
+    {
+        if (bytes is not > 0)
+            return null;
+
+        var (value, unit) = Units.Size(bytes.Value, minUnit);
+        return $"{value} {unit}";
+    }
+
+    private static string GpuMemory(GpuSpec gpu) =>
+        gpu.DedicatedMemoryBytes is { } vram ? $"{Bytes(vram, minUnit: 3)} dedicated" : "Shared";
+
+    private static string? MemoryHeadline(MemorySpec? memory) =>
+        memory is null ? null : Join(" ", Bytes(memory.TotalBytes, minUnit: 3), memory.Modules.FirstOrDefault()?.Type);
+
+    private static string? MachineHeadline(MachineSpec? machine) =>
+        machine is null ? null : Join(" ", machine.SystemManufacturer, machine.SystemFamily ?? machine.SystemModel);
+
+    private static string? StorageTotal(IReadOnlyList<DiskSpec> disks) =>
+        disks.Count == 0 ? null : $"{Bytes(disks.Sum(d => d.SizeBytes), minUnit: 3)} total";
+
+    private static string? Date(DateTime? date) => date?.ToString("d", CultureInfo.CurrentCulture);
+
+    private static string? Uptime(DateTime? lastBoot)
+    {
+        if (lastBoot is null)
+            return null;
+
+        var uptime = DateTime.Now - lastBoot.Value;
+        return uptime.TotalDays >= 1
+            ? $"{(int)uptime.TotalDays} d {uptime.Hours} h"
+            : $"{uptime.Hours} h {uptime.Minutes} min";
+    }
+
+    private static string? LinkSpeed(long bitsPerSecond) => bitsPerSecond switch
+    {
+        >= 1_000_000_000 => $"{bitsPerSecond / 1e9:0.#} Gbps",
+        > 0 => $"{bitsPerSecond / 1e6:0} Mbps",
+        _ => null,
+    };
+
+    private static string? Plural(int count, string noun) => count switch
+    {
+        0 => null,
+        1 => $"1 {noun}",
+        _ => $"{count} {noun}s",
+    };
+
+    private static string? Join(string separator, params string?[] parts)
+    {
+        var present = parts.Where(p => !string.IsNullOrWhiteSpace(p)).ToArray();
+        return present.Length == 0 ? null : string.Join(separator, present);
+    }
+}

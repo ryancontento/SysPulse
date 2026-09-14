@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject ISettingsService SettingsService
 
-<div class="shell">
+<div class="shell" data-accent="@AccentPalette.CssName(SettingsService.Current.Accent)">
     <nav class="sidebar">
         <div class="nav-group">
             <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
@@ -32,7 +34,7 @@
                 <section class="card page-error">
                     <h2 class="card-title">Something went wrong</h2>
                     <p>@exception.Message</p>
-                    <button type="button" @onclick="() => _errorBoundary?.Recover()">Try again</button>
+                    <button type="button" class="button" @onclick="() => _errorBoundary?.Recover()">Try again</button>
                 </section>
             </ErrorContent>
         </ErrorBoundary>
@@ -42,6 +44,12 @@
 @code {
     private ErrorBoundary? _errorBoundary;
 
+    protected override void OnInitialized() => SettingsService.Changed += OnSettingsChanged;
+
     // Navigating to another page clears a previous page's error.
     protected override void OnParametersSet() => _errorBoundary?.Recover();
+
+    private void OnSettingsChanged(AppSettings settings) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => SettingsService.Changed -= OnSettingsChanged;
 }

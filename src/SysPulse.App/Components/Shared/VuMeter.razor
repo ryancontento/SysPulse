@@ -1,0 +1,46 @@
+@* A segmented LED level meter on a -60…0 dB scale, with green / amber / red zones like a studio VU meter. *@
+<div class="vu @(Muted ? "muted" : null)" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Percent)">
+    @for (var i = 0; i < SegmentCount; i++)
+    {
+        var lit = i < LitSegments;
+        <span class="segment @Zone(i) @(lit ? "lit" : null)"></span>
+    }
+</div>
+<div class="scale">
+    @foreach (var mark in ScaleMarks)
+    {
+        <span style="left:@(mark.Position)%">@mark.Label</span>
+    }
+</div>
+
+@code {
+    private const int SegmentCount = 32;
+    private const double FloorDb = -60;
+
+    private static readonly (string Position, string Label)[] ScaleMarks =
+    [
+        (Position(-60), "-60"),
+        (Position(-40), "-40"),
+        (Position(-20), "-20"),
+        (Position(-10), "-10"),
+        (Position(0), "0 dB"),
+    ];
+
+    /// <summary>Linear peak amplitude, 0–1.</summary>
+    [Parameter] public double Level { get; set; }
+
+    [Parameter] public bool Muted { get; set; }
+
+    // Decibels match how loudness is heard; a linear scale would sit near empty for most sound.
+    private double Percent => Level <= 0.001 ? 0 : Math.Clamp((20 * Math.Log10(Level) - FloorDb) / -FloorDb, 0, 1) * 100;
+
+    private int LitSegments => (int)Math.Round(Percent / 100 * SegmentCount);
+
+    private static string? Zone(int segment)
+    {
+        var db = FloorDb + (segment + 0.5) / SegmentCount * -FloorDb;
+        return db >= -3 ? "danger" : db >= -12 ? "warn" : null;
+    }
+
+    private static string Position(double db) => ((db - FloorDb) / -FloorDb * 100).ToString("0.#", CultureInfo.InvariantCulture);
+}

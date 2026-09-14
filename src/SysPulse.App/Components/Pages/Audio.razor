@@ -1,3 +1,160 @@
 @page "/audio"
+@implements IDisposable
+@inject IAudioService AudioService
 
-<ComingSoon Title="Audio" />
+<div class="audio">
+    <header class="page-header">
+        <h1 class="page-title">Audio</h1>
+        <div class="page-actions">
+            <button type="button" class="button secondary" @onclick="RefreshDevices">Refresh</button>
+        </div>
+    </header>
+
+    @if (_error is not null)
+    {
+        <section class="card error">
+            <h2 class="card-title">Audio unavailable</h2>
+            <p>@_error</p>
+        </section>
+    }
+    else
+    {
+        <div class="endpoints">
+            <AudioEndpointCard Title="Output"
+                               Endpoint="_levels.Output"
+                               Level="_outputMeter"
+                               EmptyText="No output device found."
+                               VolumeChanged="@((double percent) => SetVolume(_levels.Output, percent))"
+                               MuteChanged="@((bool muted) => SetMute(_levels.Output, muted))" />
+            <AudioEndpointCard Title="Input"
+                               Endpoint="_levels.Input"
+                               Level="_inputMeter"
+                               EmptyText="No input device found."
+                               Hint="The input meter only moves while an app is using the microphone."
+                               VolumeChanged="@((double percent) => SetVolume(_levels.Input, percent))"
+                               MuteChanged="@((bool muted) => SetMute(_levels.Input, muted))" />
+        </div>
+
+        <section class="card devices">
+            <header class="card-header">
+                <h2 class="card-title">Devices</h2>
+                <span class="card-detail">@_devices.Count active</span>
+            </header>
+
+            <div class="device-list">
+                @foreach (var device in _devices)
+                {
+                    <div class="device" @key="device.Id">
+                        <span class="lamp @(device.IsDefault ? "on" : null)" title="@(device.IsDefault ? "Default device" : null)"></span>
+                        <span class="name" title="@device.Name">@device.Name</span>
+                        <span class="kind">@device.Flow</span>
+                        <span class="level readout">@(device.IsMuted ? "Muted" : $"{Math.Round(device.VolumePercent)}%")</span>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private static readonly TimeSpan LevelInterval = TimeSpan.FromMilliseconds(66);
+    private const int DeviceRefreshEveryTicks = 30; // About every 2 seconds, to pick up plugged/unplugged devices.
+
+    private readonly CancellationTokenSource _polling = new();
+    private IReadOnlyList<AudioDeviceInfo> _devices = [];
+    private AudioLevels _levels = AudioLevels.None;
+    private double _outputMeter;
+    private double _inputMeter;
+    private string? _error;
+    private bool _loopRunning;
+
+    protected override void OnInitialized()
+    {
+        Poll(refreshDevices: true);
+        StartPolling();
+    }
+
+    private void StartPolling()
+    {
+        if (!_loopRunning && _error is null)
+            _ = PollLoopAsync(_polling.Token);
+    }
+
+    // Runs on the renderer's synchronization context, so Poll and StateHasChanged stay on the UI thread.
+    private async Task PollLoopAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(LevelInterval);
+        var tick = 0;
+        _loopRunning = true;
+
+        try
+        {
+            // Stops on error; Refresh clears the error and starts a new loop.
+            while (_error is null && await timer.WaitForNextTickAsync(token))
+            {
+                Poll(refreshDevices: ++tick % DeviceRefreshEveryTicks == 0);
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Left the page.
+        }
+        finally
+        {
+            _loopRunning = false;
+        }
+    }
+
+    private void Poll(bool refreshDevices)
+    {
+        try
+        {
+            if (refreshDevices)
+                _devices = AudioService.GetDevices();
+
+            _levels = AudioService.GetLevels();
+            _outputMeter = Decay(_outputMeter, _levels.Output?.Peak ?? 0);
+            _inputMeter = Decay(_inputMeter, _levels.Input?.Peak ?? 0);
+        }
+        catch (Exception ex)
+        {
+            // Core Audio itself is unavailable, e.g. the Windows Audio service is stopped.
+            _error = ex.Message;
+        }
+    }
+
+    private void RefreshDevices()
+    {
+        _error = null;
+        Poll(refreshDevices: true);
+        StartPolling();
+    }
+
+    private void SetVolume(AudioEndpointLevel? endpoint, double percent)
+    {
+        if (endpoint is null)
+            return;
+
+        AudioService.SetVolume(endpoint.Id, percent);
+        Poll(refreshDevices: false);
+    }
+
+    private void SetMute(AudioEndpointLevel? endpoint, bool muted)
+    {
+        if (endpoint is null)
+            return;
+
+        AudioService.SetMute(endpoint.Id, muted);
+        Poll(refreshDevices: true);
+    }
+
+    // Meters jump up instantly and fall back smoothly, like a VU needle.
+    private static double Decay(double current, double peak) => Math.Max(peak, current * 0.8);
+
+    public void Dispose()
+    {
+        _polling.Cancel();
+        _polling.Dispose();
+    }
+}

@@ -21,10 +21,13 @@
 
     [Parameter] public string Unit { get; set; } = "";
 
+    /// <summary>The value that leaves the meter empty.</summary>
+    [Parameter] public double Min { get; set; }
+
     /// <summary>The value that fills the meter completely.</summary>
     [Parameter] public double Max { get; set; } = 100;
 
-    private string FillWidth => Value is { } value && Max > 0
-        ? FormattableString.Invariant($"{Math.Clamp(value / Max, 0, 1) * 100:0.#}%")
+    private string FillWidth => Value is { } value && Max > Min
+        ? FormattableString.Invariant($"{Math.Clamp((value - Min) / (Max - Min), 0, 1) * 100:0.#}%")
         : "0%";
 }

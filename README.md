@@ -5,6 +5,22 @@ network, and storage readings, plus a per-process breakdown.
 
 The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
 
+## Pages
+
+- **Dashboard:** CPU and GPU dials with temperature, clock, and fan meters; memory, network, and
+  storage cards; a sortable process table (CPU, GPU, RAM, download, upload).
+- **System Specs:** processor, graphics adapters, memory modules, motherboard and BIOS, OS, drives,
+  and network adapters. **Copy specs** puts a plain-text summary on the clipboard with IP addresses,
+  serial numbers, and MAC addresses left out.
+- **Audio:** default output and input devices with a live level meter, volume, and mute, plus a list
+  of active devices. Volume and mute only change when you use the controls.
+- **Settings:** °C/°F, accent theme, refresh rate, process grouping, and table size. Saved to
+  `%APPDATA%\SysPulse\settings.json`.
+
+SysPulse only reads from your system, except for the audio volume and mute controls. It makes no
+network connections, has no telemetry, and only writes to `%APPDATA%\SysPulse` (settings) and
+`%LOCALAPPDATA%\SysPulse` (WebView2's browser cache).
+
 ## Run
 
 ```powershell
@@ -35,8 +51,9 @@ Some readings only show up when SysPulse runs elevated:
 | CPU temperature, clock, and fan | ❌ | ✅ (also needs the [PawnIO](https://pawnio.eu/) driver installed) |
 | Per-process download / upload | ❌ | ✅ (kernel ETW session) |
 
-To always prompt for elevation, change `requestedExecutionLevel` in
-`src/SysPulse.App/app.manifest` to `requireAdministrator`.
+To run elevated every time, right-click `SysPulse.exe` → Properties → Compatibility → *Run this
+program as an administrator*. Only one copy runs at a time: launching SysPulse again brings the
+existing window to the front, so close a non-elevated copy before starting an elevated one.
 
 ## Layout
 
@@ -45,14 +62,17 @@ src/
   SysPulse.Core/        Data collection (no UI)
     Collectors/         One class per data source
     Models/             SystemSnapshot and friends
-    Services/           MetricsService: polls collectors once per second, raises Updated
+    Services/           MetricsService: polls collectors on a timer, raises Updated
+    Settings/           AppSettings record and the JSON settings store
+    Specs/              HardwareSpecsProvider (WMI + registry) for the System Specs page
+    Audio/              CoreAudioService (NAudio) for the Audio page
   SysPulse.App/         WPF host + Blazor UI
     MainWindow.xaml     Custom title bar and the BlazorWebView
     Assets/             App icon
     Components/
       Layout/           Sidebar shell
-      Pages/            Routable pages (Monitoring is the dashboard)
-      Shared/           Gauge, MetricBar, HardwareCard, ProcessTable, ...
+      Pages/            Monitoring (dashboard), SystemSpecs, Audio, Settings
+      Shared/           Gauge, MetricBar, HardwareCard, ProcessTable, VuMeter, ...
     wwwroot/            index.html, global CSS (theme tokens live in css/app.css), fonts
 tools/
   New-AppIcon.ps1       Regenerates Assets/SysPulse.ico
@@ -68,6 +88,8 @@ Data sources:
 - **Per-process GPU:** "GPU Engine" performance counters (the same source Task Manager uses)
 - **Temperatures, clocks, fans:** [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
 - **Per-process network:** kernel TCP/IP ETW events via `Microsoft.Diagnostics.Tracing.TraceEvent`
+- **System specs:** WMI (`Win32_*`, `MSFT_PhysicalDisk`) and the display adapter registry key
+- **Audio:** Windows Core Audio via [NAudio](https://github.com/naudio/NAudio)
 
 ## License
 

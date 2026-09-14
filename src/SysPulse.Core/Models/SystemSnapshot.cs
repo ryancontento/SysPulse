@@ -42,7 +42,10 @@ public sealed record StorageMetrics(long TotalBytes, long UsedBytes)
 
 public sealed record NetworkMetrics(double DownloadBytesPerSec, double UploadBytesPerSec);
 
-/// <summary>Usage for all running processes that share a name.</summary>
+/// <summary>
+/// Usage for one process, or for all running processes that share a name when grouping is on
+/// (then <see cref="ProcessId"/> is null).
+/// </summary>
 public sealed record ProcessMetrics(
     string Name,
     int InstanceCount,
@@ -50,6 +53,7 @@ public sealed record ProcessMetrics(
     double GpuPercent,
     long MemoryBytes,
     double DownloadBytesPerSec,
-    double UploadBytesPerSec);
+    double UploadBytesPerSec,
+    int? ProcessId = null);
 
 public sealed record CollectorStatus(bool IsElevated, bool HardwareSensorsAvailable, bool ProcessNetworkAvailable);

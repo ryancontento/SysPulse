@@ -1,0 +1,19 @@
+.spec-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.headline {
+    overflow: hidden;
+    font-size: 17px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}

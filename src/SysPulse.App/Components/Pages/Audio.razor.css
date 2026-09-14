@@ -1,0 +1,74 @@
+.audio {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.endpoints {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.error p {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+}
+
+.device-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+}
+
+.device {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px dashed var(--border);
+}
+
+.device:first-child {
+    border-top: none;
+}
+
+.lamp {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    background: var(--track);
+    border-radius: 50%;
+}
+
+.lamp.on {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kind {
+    padding: 1px 6px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+}
+
+.level {
+    width: 64px;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: right;
+}

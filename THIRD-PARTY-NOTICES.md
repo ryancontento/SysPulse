@@ -13,6 +13,8 @@ own license.
 | BlackSharp.Core (dependency of LibreHardwareMonitorLib) | MPL-2.0 | https://www.nuget.org/packages/BlackSharp.Core |
 | HidSharp (dependency of LibreHardwareMonitorLib) | Apache-2.0 | https://www.nuget.org/packages/HidSharp |
 | Microsoft.Diagnostics.Tracing.TraceEvent (includes native KernelTraceControl.dll and msdia140.dll) | MIT | https://www.nuget.org/packages/Microsoft.Diagnostics.Tracing.TraceEvent |
+| NAudio.Wasapi and NAudio.Core | MIT | https://www.nuget.org/packages/NAudio.Wasapi |
+| System.Management | MIT | https://www.nuget.org/packages/System.Management |
 | Microsoft.AspNetCore.Components.WebView.Wpf | MIT | https://www.nuget.org/packages/Microsoft.AspNetCore.Components.WebView.Wpf |
 | Microsoft.Extensions.Hosting | MIT | https://www.nuget.org/packages/Microsoft.Extensions.Hosting |
 | System.Diagnostics.PerformanceCounter | MIT | https://www.nuget.org/packages/System.Diagnostics.PerformanceCounter |

@@ -1,0 +1,63 @@
+<section class="card endpoint">
+    <header class="card-header">
+        <h2 class="card-title">@Title</h2>
+        <span class="card-detail">Default device</span>
+    </header>
+
+    @if (Endpoint is null)
+    {
+        <div class="empty">@EmptyText</div>
+    }
+    else
+    {
+        var volume = Math.Round(Endpoint.VolumePercent);
+        <div class="headline" title="@Endpoint.Name">@Endpoint.Name</div>
+
+        <VuMeter Level="Level" Muted="Endpoint.IsMuted" />
+
+        <div class="volume">
+            <input type="range"
+                   min="0"
+                   max="100"
+                   step="1"
+                   value="@volume"
+                   style="--fill:@(volume)%"
+                   aria-label="@($"{Title} volume")"
+                   @oninput="OnVolumeInput" />
+            <span class="readout">@volume<span class="unit">%</span></span>
+            <button type="button"
+                    class="mute @(Endpoint.IsMuted ? "on" : null)"
+                    aria-pressed="@(Endpoint.IsMuted ? "true" : "false")"
+                    @onclick="() => MuteChanged.InvokeAsync(!Endpoint.IsMuted)">
+                @(Endpoint.IsMuted ? "Muted" : "Mute")
+            </button>
+        </div>
+
+        @if (Hint is not null)
+        {
+            <p class="hint">@Hint</p>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public AudioEndpointLevel? Endpoint { get; set; }
+
+    /// <summary>Smoothed peak level for the meter, 0–1.</summary>
+    [Parameter] public double Level { get; set; }
+
+    [Parameter] public string EmptyText { get; set; } = "No device found.";
+
+    [Parameter] public string? Hint { get; set; }
+
+    [Parameter] public EventCallback<double> VolumeChanged { get; set; }
+
+    [Parameter] public EventCallback<bool> MuteChanged { get; set; }
+
+    private Task OnVolumeInput(ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent)
+            ? VolumeChanged.InvokeAsync(percent)
+            : Task.CompletedTask;
+}

@@ -26,8 +26,8 @@
                 @foreach (var process in SortedRows())
                 {
                     var (ramValue, ramUnit) = Units.Size(process.MemoryBytes, minUnit: 2);
-                    <tr @key="process.Name">
-                        <td class="name" title="@(process.InstanceCount > 1 ? $"{process.InstanceCount} processes" : null)">
+                    <tr @key="RowKey(process)">
+                        <td class="name" title="@RowTitle(process)">
                             @process.Name
                             @if (process.InstanceCount > 1)
                             {
@@ -57,7 +57,6 @@
 </section>
 
 @code {
-    private const int MaxRows = 50;
     private const double HotPercent = 25;
 
     private static readonly Column[] Columns =
@@ -77,6 +76,8 @@
 
     /// <summary>Per-process network usage needs elevation; without it those columns show a dash.</summary>
     [Parameter] public bool NetworkAvailable { get; set; }
+
+    [Parameter] public int MaxRows { get; set; } = 50;
 
     private void SortBy(SortColumn column)
     {
@@ -123,6 +124,14 @@
         column.Key is SortColumn.Download or SortColumn.Upload && !NetworkAvailable
             ? "Run as administrator to see per-process network usage"
             : null;
+
+    // Grouped rows are unique by name; ungrouped rows can share a name, so key them by PID.
+    private static object RowKey(ProcessMetrics process) => (object?)process.ProcessId ?? process.Name;
+
+    private static string? RowTitle(ProcessMetrics process) =>
+        process.ProcessId is { } id ? $"PID {id}"
+        : process.InstanceCount > 1 ? $"{process.InstanceCount} processes"
+        : null;
 
     private static string? HotClass(double percent) => percent >= HotPercent ? "hot" : null;
 

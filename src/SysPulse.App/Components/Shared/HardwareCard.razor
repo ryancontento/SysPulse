@@ -7,7 +7,7 @@
     <div class="body">
         <Gauge Value="Metrics.LoadPercent" Size="148" />
         <div class="bars">
-            <MetricBar Label="Temperature" Value="Metrics.TemperatureC" Unit="°C" Max="100" />
+            <MetricBar Label="Temperature" Value="Temperature" Unit="@TemperatureSymbol" Min="@TemperatureScale.Min" Max="@TemperatureScale.Max" />
             <MetricBar Label="Clock" Value="Metrics.ClockMhz" Unit="MHz" Max="_clockMax" />
             <MetricBar Label="Fan" Value="Metrics.FanRpm" Unit="RPM" Max="_fanMax" />
         </div>
@@ -26,10 +26,21 @@
 
     [Parameter, EditorRequired] public DeviceMetrics Metrics { get; set; } = DeviceMetrics.Empty;
 
+    [Parameter] public TemperatureUnit TemperatureUnit { get; set; }
+
     // Clock and fan meters scale against the highest value seen this session, but never below these floors.
     [Parameter] public double ClockFloorMhz { get; set; } = 5000;
 
     [Parameter] public double FanFloorRpm { get; set; } = 2500;
+
+    private bool IsFahrenheit => TemperatureUnit == TemperatureUnit.Fahrenheit;
+
+    private double? Temperature => IsFahrenheit ? Metrics.TemperatureC * 9 / 5 + 32 : Metrics.TemperatureC;
+
+    private string TemperatureSymbol => IsFahrenheit ? "°F" : "°C";
+
+    // 0–100 °C in either unit, so the meter fills the same amount whichever is shown.
+    private (double Min, double Max) TemperatureScale => IsFahrenheit ? (32, 212) : (0, 100);
 
     protected override void OnParametersSet()
     {

@@ -64,20 +64,6 @@
     color: var(--text-muted);
 }
 
-.page-error button {
-    padding: 6px 14px;
-    color: var(--bg-app);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    background: var(--accent);
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
 .content {
     min-width: 0;
     height: 100vh;

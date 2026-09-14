@@ -1,0 +1,56 @@
+.toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.track {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    transition: border-color 0.2s ease;
+}
+
+.thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background: var(--text-faint);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.state {
+    min-width: 26px;
+    text-align: left;
+}
+
+.toggle.on {
+    color: var(--accent);
+}
+
+.toggle.on .track {
+    border-color: var(--accent-border);
+}
+
+/* When on, the thumb becomes a lit lamp. */
+.toggle.on .thumb {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    transform: translateX(20px);
+}

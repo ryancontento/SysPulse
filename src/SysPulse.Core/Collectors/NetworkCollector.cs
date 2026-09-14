@@ -7,8 +7,9 @@ namespace SysPulse.Core.Collectors;
 /// <summary>System-wide download/upload rates summed across physical adapters.</summary>
 internal sealed class NetworkCollector
 {
-    // Virtual adapters (Hyper-V/WSL switches, VPNs) re-carry traffic that already crossed a physical adapter.
-    private static readonly string[] ExcludedDescriptions = ["Hyper-V", "Virtual", "Loopback", "Pseudo", "VPN", "TAP-"];
+    // Virtual adapters (Hyper-V/WSL switches, VPNs) and WAN miniport/filter interfaces re-carry traffic that
+    // already crossed a physical adapter.
+    private static readonly string[] ExcludedDescriptions = ["Hyper-V", "Virtual", "Loopback", "Pseudo", "VPN", "TAP-", "Miniport", "Filter"];
 
     private readonly Dictionary<string, (long Received, long Sent)> _previous = new();
     private long _previousTimestamp;
@@ -48,7 +49,7 @@ internal sealed class NetworkCollector
             : new NetworkMetrics(receivedDelta / seconds, sentDelta / seconds);
     }
 
-    private static bool IsPhysical(NetworkInterface nic) =>
+    internal static bool IsPhysical(NetworkInterface nic) =>
         nic.OperationalStatus == OperationalStatus.Up
         && nic.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
         && !ExcludedDescriptions.Any(d => nic.Description.Contains(d, StringComparison.OrdinalIgnoreCase));

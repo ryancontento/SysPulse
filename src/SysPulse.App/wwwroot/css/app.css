@@ -23,9 +23,11 @@
     --text-muted: #a39a88;
     --text-faint: #6b6457;
 
-    /* Amber phosphor accent */
+    /* Amber phosphor accent (see the [data-accent] themes below) */
     --accent: #f0a33a;
+    --accent-deep: #c7822a;
     --accent-soft: rgba(240, 163, 58, 0.12);
+    --accent-border: rgba(240, 163, 58, 0.22);
     --accent-glow: rgba(240, 163, 58, 0.4);
     --track: #2a2721;
 
@@ -38,6 +40,34 @@
     --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
     --radius: 6px;
+}
+
+/*
+ * Accent themes (Settings → Accent). The layout shell carries data-accent; setting swatches carry their own
+ * so each previews its color. Keep in sync with AccentPalette.cs (the WPF title bar lamp).
+ */
+[data-accent="amber"] {
+    --accent: #f0a33a;
+    --accent-deep: #c7822a;
+    --accent-soft: rgba(240, 163, 58, 0.12);
+    --accent-border: rgba(240, 163, 58, 0.22);
+    --accent-glow: rgba(240, 163, 58, 0.4);
+}
+
+[data-accent="phosphor"] {
+    --accent: #6fdc8c;
+    --accent-deep: #3f9d5a;
+    --accent-soft: rgba(111, 220, 140, 0.12);
+    --accent-border: rgba(111, 220, 140, 0.22);
+    --accent-glow: rgba(111, 220, 140, 0.4);
+}
+
+[data-accent="arctic"] {
+    --accent: #8fd3e8;
+    --accent-deep: #5a9fb5;
+    --accent-soft: rgba(143, 211, 232, 0.12);
+    --accent-border: rgba(143, 211, 232, 0.22);
+    --accent-glow: rgba(143, 211, 232, 0.4);
 }
 
 *, *::before, *::after {
@@ -74,6 +104,37 @@ body {
     font-size: 12px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+}
+
+/* Page headers (pages other than the dashboard) */
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 32px;
+    padding: 0 2px;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.page-detail {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.page-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 /* Panels */
@@ -120,6 +181,48 @@ body {
 .card-footer {
     padding-top: 10px;
     border-top: 1px solid var(--border);
+}
+
+/* Buttons */
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    color: var(--bg-app);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: var(--accent);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+}
+
+.button:hover {
+    filter: brightness(1.08);
+}
+
+.button.secondary {
+    color: var(--text-muted);
+    background: transparent;
+    border-color: var(--border-strong);
+}
+
+.button.secondary:hover {
+    color: var(--text);
+    border-color: var(--text-faint);
+    filter: none;
+}
+
+.button:disabled {
+    cursor: default;
+    filter: none;
+    opacity: 0.45;
 }
 
 /* Numeric readouts */

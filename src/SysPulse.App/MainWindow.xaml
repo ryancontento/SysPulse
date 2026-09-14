@@ -74,13 +74,14 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <!-- Amber "power lamp" -->
-                    <Border Width="8" Height="8"
+                    <Border x:Name="PowerLamp"
+                            Width="8" Height="8"
                             Margin="0,1,10,0"
                             CornerRadius="4"
                             VerticalAlignment="Center"
                             Background="{StaticResource AccentBrush}">
                         <Border.Effect>
-                            <DropShadowEffect Color="{StaticResource AccentColor}" BlurRadius="9" ShadowDepth="0" Opacity="0.8" />
+                            <DropShadowEffect x:Name="PowerLampGlow" Color="{StaticResource AccentColor}" BlurRadius="9" ShadowDepth="0" Opacity="0.8" />
                         </Border.Effect>
                     </Border>
                     <TextBlock VerticalAlignment="Center"

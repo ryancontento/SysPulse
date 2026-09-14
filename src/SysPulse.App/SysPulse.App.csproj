@@ -9,6 +9,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>SysPulse.App</RootNamespace>
     <AssemblyName>SysPulse</AssemblyName>
+    <Version>0.3.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Regenerate with tools/New-AppIcon.ps1. -->
     <ApplicationIcon>Assets\SysPulse.ico</ApplicationIcon>
@@ -33,7 +34,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.101" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-  </ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />  </ItemGroup>
 
 </Project>

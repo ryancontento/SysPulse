@@ -1,6 +1,9 @@
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.AspNetCore.Components.WebView;
+using Microsoft.Extensions.DependencyInjection;
 using SysPulse.Core;
+using SysPulse.Core.Settings;
 
 namespace SysPulse.App;
 
@@ -10,10 +13,22 @@ public partial class MainWindow : Window
     private static readonly string MaximizeGlyph = ((char)0xE922).ToString();
     private static readonly string RestoreGlyph = ((char)0xE923).ToString();
 
+    private readonly ISettingsService _settings;
+
     public MainWindow(IServiceProvider services)
     {
         InitializeComponent();
         WebView.Services = services;
+
+        _settings = services.GetRequiredService<ISettingsService>();
+        ApplyAccent(_settings.Current);
+        _settings.Changed += OnSettingsChanged;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _settings.Changed -= OnSettingsChanged;
+        base.OnClosed(e);
     }
 
     protected override void OnStateChanged(EventArgs e)
@@ -32,6 +47,15 @@ public partial class MainWindow : Window
         MaximizeButton.ToolTip = maximized ? "Restore" : "Maximize";
     }
 
+    private void OnSettingsChanged(AppSettings settings) => Dispatcher.InvokeAsync(() => ApplyAccent(settings));
+
+    private void ApplyAccent(AppSettings settings)
+    {
+        var color = AccentPalette.For(settings.Accent);
+        PowerLamp.Background = new SolidColorBrush(color);
+        PowerLampGlow.Color = color;
+    }
+
     private void WebView_Initializing(object? sender, BlazorWebViewInitializingEventArgs e)
     {
         // WebView2 defaults to a profile folder next to the exe, which fails if the app lives somewhere
@@ -45,7 +69,11 @@ public partial class MainWindow : Window
     {
         var settings = e.WebView.CoreWebView2.Settings;
         settings.IsZoomControlEnabled = false;
+        settings.IsStatusBarEnabled = false;
+        settings.IsGeneralAutofillEnabled = false;
+        settings.IsPasswordAutosaveEnabled = false;
 #if !DEBUG
+        settings.AreDevToolsEnabled = false;
         settings.AreDefaultContextMenusEnabled = false;
         settings.AreBrowserAcceleratorKeysEnabled = false;
 #endif

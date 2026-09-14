@@ -1,7 +1,9 @@
+using System.Globalization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SysPulse.Core.Collectors;
 using SysPulse.Core.Models;
+using SysPulse.Core.Settings;
 
 namespace SysPulse.Core.Services;
 
@@ -13,10 +15,9 @@ public interface IMetricsSource
     event Action<SystemSnapshot>? Updated;
 }
 
-/// <summary>Polls every collector once per second and publishes a <see cref="SystemSnapshot"/>.</summary>
-public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundService, IMetricsSource
+/// <summary>Polls every collector on the configured interval and publishes a <see cref="SystemSnapshot"/>.</summary>
+public sealed class MetricsService(ISettingsService settings, ILogger<MetricsService> logger) : BackgroundService, IMetricsSource
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
     private static readonly IReadOnlyDictionary<int, NetworkMetrics> NoProcessNetwork = new Dictionary<int, NetworkMetrics>();
     private const int StorageSampleEveryTicks = 5;
 
@@ -40,11 +41,14 @@ public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundS
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var timer = new PeriodicTimer(PollingInterval(settings.Current));
+        void OnSettingsChanged(AppSettings updated) => timer.Period = PollingInterval(updated);
+        settings.Changed += OnSettingsChanged;
+
         try
         {
             await Task.Run(Initialize, stoppingToken);
 
-            using var timer = new PeriodicTimer(Interval);
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 var snapshot = Collect();
@@ -66,12 +70,16 @@ public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundS
         }
         finally
         {
+            settings.Changed -= OnSettingsChanged;
+
             // Only this method touches the collectors, so release them here rather than in Dispose,
             // where a slow Initialize or an in-flight Collect could still be using them.
             _processNetwork.Dispose();
             _hardware.Dispose();
         }
     }
+
+    private static TimeSpan PollingInterval(AppSettings appSettings) => TimeSpan.FromSeconds(appSettings.PollingIntervalSeconds);
 
     private void Initialize()
     {
@@ -120,8 +128,9 @@ public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundS
         var cpu = new DeviceMetrics(cpuSensors.Name, cpuLoad, cpuSensors.TemperatureC, cpuSensors.ClockMhz, cpuSensors.FanRpm);
         var gpu = new DeviceMetrics(gpuSensors.Name, gpuSensors.LoadPercent ?? gpuEngines.TotalPercent, gpuSensors.TemperatureC, gpuSensors.ClockMhz, gpuSensors.FanRpm);
 
+        var groupByName = settings.Current.GroupProcesses;
         var processes = processSamples
-            .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(p => groupByName ? p.Name : p.Id.ToString(CultureInfo.InvariantCulture), StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
                 double cpuPercent = 0, gpuPercent = 0, download = 0, upload = 0;
@@ -140,7 +149,16 @@ public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundS
                     }
                 }
 
-                return new ProcessMetrics(group.Key, group.Count(), Math.Min(cpuPercent, 100), Math.Min(gpuPercent, 100), memoryBytes, download, upload);
+                var first = group.First();
+                return new ProcessMetrics(
+                    first.Name,
+                    group.Count(),
+                    Math.Min(cpuPercent, 100),
+                    Math.Min(gpuPercent, 100),
+                    memoryBytes,
+                    download,
+                    upload,
+                    groupByName ? null : first.Id);
             })
             .ToList();
 
@@ -170,7 +188,7 @@ public sealed class MetricsService(ILogger<MetricsService> logger) : BackgroundS
         }
         catch (Exception ex)
         {
-            // Log once per failure streak rather than every second.
+            // Log once per failure streak rather than every tick.
             if (_failingCollectors.Add(collector))
                 logger.LogWarning(ex, "{Collector} collector failed", collector);
             return fallback;

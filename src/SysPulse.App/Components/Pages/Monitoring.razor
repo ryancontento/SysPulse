@@ -1,6 +1,7 @@
 @page "/"
 @implements IDisposable
 @inject IMetricsSource MetricsSource
+@inject ISettingsService SettingsService
 
 <div class="dashboard">
     @if (Notice is { } notice)
@@ -9,8 +10,8 @@
     }
 
     <div class="row hardware">
-        <HardwareCard Title="CPU" Metrics="_snapshot.Cpu" ClockFloorMhz="5000" FanFloorRpm="2500" />
-        <HardwareCard Title="GPU" Metrics="_snapshot.Gpu" ClockFloorMhz="2500" FanFloorRpm="3000" />
+        <HardwareCard Title="CPU" Metrics="_snapshot.Cpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="5000" FanFloorRpm="2500" />
+        <HardwareCard Title="GPU" Metrics="_snapshot.Gpu" TemperatureUnit="Settings.TemperatureUnit" ClockFloorMhz="2500" FanFloorRpm="3000" />
     </div>
 
     <div class="row system">
@@ -67,7 +68,7 @@
         </section>
     </div>
 
-    <ProcessTable Processes="_snapshot.Processes" NetworkAvailable="_snapshot.Status.ProcessNetworkAvailable" />
+    <ProcessTable Processes="_snapshot.Processes" NetworkAvailable="_snapshot.Status.ProcessNetworkAvailable" MaxRows="Settings.ProcessRows" />
 </div>
 
 @code {
@@ -75,6 +76,8 @@
     private const double NetworkReferenceBytesPerSec = 100_000_000 / 8.0;
 
     private SystemSnapshot _snapshot = SystemSnapshot.Empty;
+
+    private AppSettings Settings => SettingsService.Current;
 
     private double NetworkLoadPercent =>
         (_snapshot.Network.DownloadBytesPerSec + _snapshot.Network.UploadBytesPerSec) / NetworkReferenceBytesPerSec * 100;

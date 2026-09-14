@@ -1,0 +1,16 @@
+.heading {
+    margin-top: 10px;
+    padding-top: 12px;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-top: 1px solid var(--border-strong);
+}
+
+.heading:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}

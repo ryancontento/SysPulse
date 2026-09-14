@@ -34,6 +34,6 @@
 
 .fill {
     height: 100%;
-    background: linear-gradient(90deg, #c7822a, var(--accent));
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
     transition: width 0.6s ease;
 }
