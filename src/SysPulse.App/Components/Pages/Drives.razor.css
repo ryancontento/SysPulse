@@ -1,0 +1,168 @@
+.drives {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.notice {
+    padding: 8px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+/* An odd card out at the end spans the full width instead of leaving a hole. */
+.grid .drive-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+.placeholder {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.placeholder .lamp {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.drive-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.lamp {
+    width: 7px;
+    height: 7px;
+    background: var(--lamp);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 0 8px var(--lamp);
+}
+
+.good {
+    --lamp: var(--ok);
+}
+
+.warn {
+    --lamp: var(--warn);
+}
+
+/* A drive saying it expects to fail is the one thing on this page worth shouting about. */
+.bad {
+    --lamp: var(--danger);
+    color: var(--danger);
+}
+
+.unknown {
+    --lamp: var(--text-faint);
+}
+
+.rates {
+    display: flex;
+    gap: 22px;
+}
+
+.rate {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--border-strong);
+}
+
+.direction {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.rate .readout {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.volumes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 2px;
+}
+
+.volume-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 5px;
+}
+
+.volume-name {
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.volume-space {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* Same segmented LED ladder as MetricBar, so the meters on this page match the rest of the app. */
+.meter {
+    height: 8px;
+    background: var(--track);
+    -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+    mask-image: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+}
+
+.fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    transition: width 0.6s ease;
+}
+
+.meter.full .fill {
+    background: linear-gradient(90deg, var(--accent-deep), var(--danger));
+}

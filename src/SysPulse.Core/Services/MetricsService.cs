@@ -124,10 +124,10 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
         var cpuLoad = Sample("CPU load", _cpuLoad.Sample, previous.Cpu.LoadPercent);
         var memory = Sample("Memory", _memory.Sample, previous.Memory);
         var network = Sample("Network", _network.Sample, previous.Network);
-        var diskActive = Sample<double?>("Disk activity", _diskActivity.Sample, null);
+        var diskActivity = Sample("Disk activity", _diskActivity.Sample, DiskActivitySample.None);
 
         if (_tick++ % StorageSampleEveryTicks == 0)
-            _lastStorage = Sample("Storage", _storage.Sample, _lastStorage);
+            _lastStorage = Sample("Storage", () => _storage.Sample(diskActivity.VolumeDiskNumbers), _lastStorage);
 
         var gpuLoad = gpuSensors.LoadPercent ?? gpuEngines.TotalPercent;
         var cpuThrottle = Sample("CPU throttle", () => _throttle.Cpu(cpuLoad, cpuSensors), null);
@@ -176,7 +176,7 @@ public sealed class MetricsService(ISettingsService settings, ILogger<MetricsSer
             gpu,
             memory,
             network,
-            _lastStorage with { ActivePercent = diskActive },
+            _lastStorage with { ActivePercent = diskActivity.BusiestActivePercent, Disks = diskActivity.Disks },
             processes,
             new CollectorStatus(_isElevated, cpuSensors.TemperatureC.HasValue, _processNetwork.IsAvailable));
     }

@@ -13,6 +13,10 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
 |---|---|
 | ![The Flight Recorder: oscilloscope-style traces for CPU, GPU, memory, temperature, power, and network over the last five minutes](docs/screenshots/recorder.png) | ![The Why Slow? check reporting that nothing looks wrong](docs/screenshots/why-slow.png) |
 
+**Storage**, one card per drive:
+
+![The Storage page showing an NVMe SSD with a healthy status lamp, active time meter, read and write rates, temperature, wear, and a meter for the C: volume](docs/screenshots/storage.png)
+
 **Mini widget**, an always-on-top strip for a second screen:
 
 ![The mini widget styled like a rack-mounted panel, showing CPU, GPU, RAM, and network readouts with throttle and alert lamps](docs/screenshots/widget.png)
@@ -41,6 +45,11 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
   trigger ends. Profiles (also in the title bar) set the Windows power mode: Silent is best power
   efficiency, Default is balanced, Performance is best performance. Notifications come from the
   SysPulse tray icon.
+- **Storage:** one card per physical drive, with its model, bus and media type, health status, live active
+  time, and read/write rates, plus a space meter for every volume on it. Running as administrator adds what
+  the drive reports about itself: temperature, wear (how much of its rated write endurance is used up),
+  power-on hours, and uncorrected error counts. A drive that says it expects to fail is called out in red.
+  Drives report different subsets of this, so rows the drive doesn't report are simply left out.
 - **System Specs:** processor, graphics adapters, memory modules, motherboard and BIOS, OS, drives,
   and network adapters. **Copy specs** puts a plain-text summary on the clipboard with IP addresses,
   serial numbers, and MAC addresses left out.
@@ -94,23 +103,29 @@ Requires the .NET 10 SDK and the WebView2 runtime (included with Windows 11).
 ## Publish
 
 ```powershell
+.\tools\Publish.ps1
+```
+
+The script first asks a running SysPulse (including one hidden in the tray) to exit so its files aren't locked,
+then publishes. Add `-Destination C:\Tools\SysPulse` to copy the result somewhere, or `-SelfContained` for PCs
+without the .NET 10 Desktop Runtime. The plain equivalent is:
+
+```powershell
 dotnet publish src/SysPulse.App -c Release -r win-x64 --self-contained false
 ```
 
-To make a GitHub release, bump `<Version>` in `src/SysPulse.App/SysPulse.App.csproj`, commit, then push a
-matching tag. The Release workflow builds both zips and attaches them:
+Output goes to `src/SysPulse.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`. Copy that
+whole folder wherever you want to keep the app.
+
+### Releases
+
+Bump `<Version>` in `src/SysPulse.App/SysPulse.App.csproj`, commit, then push a matching tag. GitHub Actions
+(`.github/workflows/release.yml`) builds both zips and attaches them to a GitHub Release:
 
 ```powershell
 git tag v0.5.0
 git push origin v0.5.0
 ```
-
-For your own copy, use `tools\Publish.ps1`, which first asks a running SysPulse (including one hidden in the tray) to
-exit so its files aren't locked, and can copy the result somewhere with `-Destination C:\Tools\SysPulse`.
-
-Output goes to `src/SysPulse.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`. Copy that
-whole folder wherever you want to keep the app. Use `--self-contained true` to run on machines without
-the .NET 10 Desktop Runtime.
 
 ### Administrator rights
 
@@ -119,6 +134,9 @@ Some readings only show up when SysPulse runs elevated:
 | Reading | Without admin | With admin |
 |---|---|---|
 | CPU / RAM / storage / network totals | ✅ | ✅ |
+| Per-drive space, active time, read / write | ✅ | ✅ |
+| Drive health status and predicted failure | ✅ | ✅ |
+| Drive temperature, wear, power-on hours | ❌ | ✅ (drives report different subsets) |
 | Per-process CPU, GPU, RAM | ✅ (a few protected processes read 0% CPU) | ✅ |
 | GPU load, temperature, clock, fan, power | ✅ on most NVIDIA/AMD cards | ✅ |
 | Throttling (CPU on any PC, GPU on NVIDIA) | ✅ | ✅ |
@@ -141,13 +159,15 @@ src/
     Services/           MetricsService: polls collectors on a timer, raises Updated
     Settings/           AppSettings record and the JSON settings store
     Specs/              HardwareSpecsProvider (WMI + registry) for the System Specs page
+    Storage/            DiskHealthProvider: per-drive health and SMART counters for the Storage page
     Audio/              CoreAudioService (NAudio) for the Audio page
     Recording/          FlightRecorder (rolling one-hour history) and EventDetector (spikes)
     Rules/              AlertRule and the RuleEngine that evaluates rules on every sample
     Power/              Profiles mapped to Windows power modes
     Diagnostics/        SlowdownAnalyzer for the Why Slow? page
     Startup/            Start with Windows (Run key or scheduled task)
-    Remote/             Phone dashboard: HttpListener server, one-time setup, and the phone page (phone.html)
+    Remote/             Phone dashboard: HttpListener server, one-time setup, trusted networks, and the phone page (phone.html)
+    Processes/          Process actions (end, open file location, priority) with a protected list
   SysPulse.App/         WPF host + Blazor UI
     MainWindow.xaml     Custom title bar (with the profile dropdown) and the BlazorWebView
     TrayIcon.cs         Notification-area icon; shows rule notifications
@@ -155,12 +175,18 @@ src/
     Assets/             App icon
     Components/
       Layout/           Sidebar shell
-      Pages/            Monitoring (dashboard), Timeline (Flight Recorder), Checkup (Why Slow?), Rules, SystemSpecs, Audio, Settings
+      Pages/            Monitoring (dashboard), Timeline (Flight Recorder), Checkup (Why Slow?), Rules, Drives (Storage), SystemSpecs, Audio, Settings
       Shared/           Gauge, MetricBar, HardwareCard, ProcessTable, Sparkline, VuMeter, ...
     wwwroot/            index.html, global CSS (theme tokens live in css/app.css), fonts
 tools/
   New-AppIcon.ps1       Regenerates Assets/SysPulse.ico
   Publish.ps1           Closes a running SysPulse cleanly, then publishes (optionally copies to a folder)
+docs/
+  DEVELOPMENT.md        Developer guide: architecture, conventions, gotchas, testing, releasing
+  screenshots/          Images used in this README
+.github/workflows/
+  ci.yml                Builds on every push and pull request
+  release.yml           Pushing a v* tag publishes the release zips
 ```
 
 Data sources:
@@ -168,7 +194,7 @@ Data sources:
 - **CPU load:** `GetSystemTimes`
 - **RAM:** `GlobalMemoryStatusEx`
 - **Network totals:** `NetworkInterface` statistics (virtual adapters excluded)
-- **Storage:** `DriveInfo` across all fixed drives
+- **Storage:** `DriveInfo` across all fixed drives, and per volume for the Storage page
 - **Per-process CPU/RAM:** `System.Diagnostics.Process`, grouped by process name
 - **Per-process GPU:** "GPU Engine" performance counters (the same source Task Manager uses)
 - **Temperatures, clocks, fans, power:** [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
@@ -178,7 +204,19 @@ Data sources:
 - **Profiles:** `powrprof.dll` power plan and power mode (overlay scheme) functions
 - **CPU throttling:** the `Processor Information\% Performance Limit` performance counter
 - **GPU throttling (NVIDIA):** clock event reasons from NVML (`nvml.dll`, installed with the NVIDIA driver)
-- **Disk activity:** `PhysicalDisk\% Idle Time` performance counters (busiest disk)
+- **Disk activity:** `PhysicalDisk` performance counters — `% Idle Time` (busiest disk on the dashboard, per
+  disk on the Storage page) and `Disk Read/Write Bytes/sec`. The counter instance names ("0 C:", "1 D: E:")
+  are also how SysPulse knows which physical disk a drive letter sits on
+- **Drive health and SMART:** `MSFT_PhysicalDisk` for model, media and bus type, and health status, plus the
+  associated `MSFT_StorageReliabilityCounter` for temperature, wear, and power-on hours (that one needs
+  administrator rights)
+- **Trusted networks (phone):** the router's MAC address via `SendARP`, stored only as a hash, and the Wi-Fi
+  name from `netsh wlan show interfaces` when Windows shares it
+
+## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the architecture, conventions, known gotchas, how changes
+are tested, and how releases are made.
 
 ## License
 

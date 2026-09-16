@@ -10,6 +10,7 @@ using SysPulse.Core.Services;
 using SysPulse.Core.Settings;
 using SysPulse.Core.Specs;
 using SysPulse.Core.Startup;
+using SysPulse.Core.Storage;
 
 namespace SysPulse.Core;
 
@@ -20,6 +21,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IHardwareSpecsProvider, HardwareSpecsProvider>();
+        services.AddSingleton<IDiskHealthProvider, DiskHealthProvider>();
         services.AddSingleton<IAudioService, CoreAudioService>();
         services.AddSingleton<IPowerProfileService, WindowsPowerProfileService>();
         services.AddSingleton<IStartupService, WindowsStartupService>();

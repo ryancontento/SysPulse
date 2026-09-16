@@ -62,7 +62,28 @@ public sealed record MemoryMetrics(long TotalBytes, long UsedBytes)
 public sealed record StorageMetrics(long TotalBytes, long UsedBytes, double? ActivePercent = null)
 {
     public double LoadPercent => TotalBytes == 0 ? 0 : 100.0 * UsedBytes / TotalBytes;
+
+    /// <summary>One entry per fixed volume. Empty until the first storage sample.</summary>
+    public IReadOnlyList<VolumeMetrics> Volumes { get; init; } = [];
+
+    /// <summary>
+    /// One entry per physical disk, from the PhysicalDisk performance counters. Empty when those counters are
+    /// unavailable, and a disk only appears once it has two samples to work out a rate from.
+    /// </summary>
+    public IReadOnlyList<DiskMetrics> Disks { get; init; } = [];
 }
+
+/// <summary>Space on one mounted fixed volume.</summary>
+/// <param name="Letter">The drive letter with its colon, e.g. "C:".</param>
+/// <param name="DiskNumber">The physical disk this volume sits on, or null when Windows doesn't say.</param>
+public sealed record VolumeMetrics(string Letter, string? Label, string? FileSystem, long TotalBytes, long UsedBytes, int? DiskNumber)
+{
+    public double LoadPercent => TotalBytes == 0 ? 0 : 100.0 * UsedBytes / TotalBytes;
+}
+
+/// <summary>Live activity for one physical disk.</summary>
+/// <param name="Number">The Windows disk number, which matches <see cref="VolumeMetrics.DiskNumber"/>.</param>
+public sealed record DiskMetrics(int Number, double ActivePercent, double ReadBytesPerSec, double WriteBytesPerSec);
 
 public sealed record NetworkMetrics(double DownloadBytesPerSec, double UploadBytesPerSec);
 

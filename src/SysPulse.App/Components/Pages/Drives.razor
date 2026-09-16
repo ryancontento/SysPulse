@@ -1,0 +1,276 @@
+@page "/storage"
+@implements IDisposable
+@inject IMetricsSource MetricsSource
+@inject IDiskHealthProvider DiskHealth
+@inject ISettingsService SettingsService
+
+<div class="drives">
+    <header class="page-header">
+        <h1 class="page-title">Storage</h1>
+        <div class="page-actions">
+            @if (_status is { } status)
+            {
+                <span class="page-detail">@status</span>
+            }
+            <button type="button" class="button secondary" disabled="@_loading" @onclick="RefreshAsync">Refresh</button>
+        </div>
+    </header>
+
+    @if (_report is { DetailRequiresAdmin: true })
+    {
+        <div class="notice">
+            Drive temperature, wear, and power-on hours need administrator rights. Everything else on this page
+            works without them.
+        </div>
+    }
+
+    @{
+        var drives = BuildDrives();
+    }
+
+    @if (drives.Count == 0)
+    {
+        <section class="card placeholder">
+            @if (_loading)
+            {
+                <span class="lamp"></span>
+                <span>Reading drives…</span>
+            }
+            else
+            {
+                <span>No fixed drives found.</span>
+            }
+        </section>
+    }
+    else
+    {
+        <div class="grid">
+            @foreach (var drive in drives)
+            {
+                <section class="card drive-card">
+                    <header class="card-header">
+                        <h2 class="card-title" title="@drive.Title">@drive.Title</h2>
+                        <span class="card-detail">@drive.Detail</span>
+                    </header>
+
+                    @if (drive.Health is { } health)
+                    {
+                        <div class="status @StatusClass(health)">
+                            <span class="lamp"></span>@StatusText(health)
+                        </div>
+                    }
+
+                    @if (drive.Number is not null)
+                    {
+                        <MetricBar Label="Active time" Value="drive.Activity?.ActivePercent" Unit="%" Max="100" />
+
+                        <div class="rates">
+                            <div class="rate">
+                                <span class="direction">Read</span>
+                                <span class="readout">@Rate(drive.Activity?.ReadBytesPerSec)</span>
+                            </div>
+                            <div class="rate">
+                                <span class="direction">Write</span>
+                                <span class="readout">@Rate(drive.Activity?.WriteBytesPerSec)</span>
+                            </div>
+                        </div>
+                    }
+
+                    @if (drive.Health is { HasDetail: true } detail)
+                    {
+                        <dl class="rows">
+                            <SpecRow Label="Temperature" Value="@Temperature(detail.TemperatureC)"
+                                     Tooltip="@(detail.TemperatureMaxC is { } max ? $"Highest recorded: {Temperature(max)}" : null)" />
+                            <SpecRow Label="Wear" Value="@Wear(detail.WearPercent)"
+                                     Tooltip="How much of the drive's rated write endurance is used up" />
+                            <SpecRow Label="Powered on" Value="@PowerOnHours(detail.PowerOnHours)" />
+                            <SpecRow Label="Read errors" Value="@Errors(detail.ReadErrorsUncorrected)" />
+                            <SpecRow Label="Write errors" Value="@Errors(detail.WriteErrorsUncorrected)" />
+                        </dl>
+                    }
+
+                    <div class="volumes">
+                        @foreach (var volume in drive.Volumes)
+                        {
+                            <div class="volume">
+                                <div class="volume-row">
+                                    <span class="volume-name">@volume.Letter@(volume.Label is null ? null : $"  {volume.Label}")</span>
+                                    <span class="volume-space">@Units.UsedOfTotal(volume.UsedBytes, volume.TotalBytes)</span>
+                                </div>
+                                <div class="meter @(volume.LoadPercent >= 90 ? "full" : null)">
+                                    <div class="fill" style="width:@Percent(volume.LoadPercent)"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private SystemSnapshot _snapshot = SystemSnapshot.Empty;
+    private DiskHealthReport? _report;
+    private bool _loading;
+    private string? _status;
+
+    private bool IsFahrenheit => SettingsService.Current.TemperatureUnit == TemperatureUnit.Fahrenheit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _snapshot = MetricsSource.Current;
+        MetricsSource.Updated += OnUpdated;
+        await LoadHealthAsync(refresh: false);
+    }
+
+    public void Dispose() => MetricsSource.Updated -= OnUpdated;
+
+    private void OnUpdated(SystemSnapshot snapshot) =>
+        _ = InvokeAsync(() =>
+        {
+            _snapshot = snapshot;
+            StateHasChanged();
+
+            // Cheap while the report is fresh; the provider re-reads itself in the background about once a minute.
+            _ = ShowHealthAsync(DiskHealth.GetAsync());
+        });
+
+    private async Task ShowHealthAsync(Task<DiskHealthReport> pending)
+    {
+        try
+        {
+            var report = await pending;
+            if (ReferenceEquals(report, _report))
+                return;
+
+            _report = report;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception)
+        {
+            // Keep showing the last report; the Refresh button surfaces the failure if it persists.
+        }
+    }
+
+    private Task RefreshAsync() => LoadHealthAsync(refresh: true);
+
+    private async Task LoadHealthAsync(bool refresh)
+    {
+        _loading = true;
+        _status = refresh ? "Refreshing…" : null;
+
+        try
+        {
+            _report = await DiskHealth.GetAsync(refresh);
+            _status = null;
+        }
+        catch (Exception)
+        {
+            _status = "Couldn't read drive health";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// One card per physical disk, joining what WMI says about the drive to its live activity and the volumes
+    /// sitting on it. Volumes Windows won't place on a disk get a card of their own rather than disappearing.
+    /// </summary>
+    private IReadOnlyList<DriveView> BuildDrives()
+    {
+        var storage = _snapshot.Storage;
+        var health = _report?.Disks ?? [];
+
+        var numbers = health.Select(d => d.Number)
+            .Concat(storage.Disks.Select(d => d.Number))
+            .Concat(storage.Volumes.Where(v => v.DiskNumber is not null).Select(v => v.DiskNumber!.Value))
+            .Distinct()
+            .Order()
+            .ToList();
+
+        var drives = numbers
+            .Select(number => new DriveView(
+                number,
+                health.FirstOrDefault(d => d.Number == number),
+                storage.Disks.FirstOrDefault(d => d.Number == number),
+                storage.Volumes.Where(v => v.DiskNumber == number).ToList()))
+            .ToList();
+
+        var unplaced = storage.Volumes.Where(v => v.DiskNumber is null).ToList();
+        if (unplaced.Count > 0)
+            drives.Add(new DriveView(null, null, null, unplaced));
+
+        return drives;
+    }
+
+    private sealed record DriveView(int? Number, DiskHealth? Health, DiskMetrics? Activity, IReadOnlyList<VolumeMetrics> Volumes)
+    {
+        public string Title => Health?.Model ?? (Number is { } number ? $"Disk {number}" : "Other volumes");
+
+        public string? Detail => Join(" · ", Kind, Size);
+
+        private string? Kind => Health is null
+            ? null
+            : Join(" ", Health.BusType, Health.MediaType ?? (Health.SpindleRpm is not null ? "HDD" : null));
+
+        private string? Size
+        {
+            get
+            {
+                var bytes = Health is { SizeBytes: > 0 } health ? health.SizeBytes : Volumes.Sum(v => v.TotalBytes);
+                if (bytes <= 0)
+                    return null;
+
+                var (value, unit) = Units.Size(bytes, minUnit: 3);
+                return $"{value} {unit}";
+            }
+        }
+    }
+
+    private static string StatusText(DiskHealth health) =>
+        health.PredictedFailure ? "Failure predicted" : health.Status ?? "Status unknown";
+
+    // Patterns use >= because Razor reads "< 25" in a code block as the start of an HTML tag.
+    private static string StatusClass(DiskHealth health) => health switch
+    {
+        { PredictedFailure: true } or { Status: "Unhealthy" } => "bad",
+        { Status: "Warning" } => "warn",
+        { Status: "Healthy" } => "good",
+        _ => "unknown",
+    };
+
+    private static string Rate(double? bytesPerSecond)
+    {
+        if (bytesPerSecond is null)
+            return "—";
+
+        var (value, unit) = Units.Size(bytesPerSecond.Value, minUnit: 1);
+        return $"{value} {unit}/s";
+    }
+
+    private static string Percent(double value) =>
+        FormattableString.Invariant($"{Math.Clamp(value, 0, 100):0.#}%");
+
+    private string? Temperature(double? celsius) => celsius switch
+    {
+        null => null,
+        { } c when IsFahrenheit => $"{c * 9 / 5 + 32:0} °F",
+        { } c => $"{c:0} °C",
+    };
+
+    private static string? Wear(int? percent) => percent is null ? null : $"{percent.Value}% used";
+
+    private static string? PowerOnHours(long? hours) =>
+        hours is null ? null : $"{hours.Value.ToString("N0", CultureInfo.CurrentCulture)} hours";
+
+    private static string? Errors(long? count) => count?.ToString("N0", CultureInfo.CurrentCulture);
+
+    private static string? Join(string separator, params string?[] parts)
+    {
+        var present = parts.Where(p => !string.IsNullOrWhiteSpace(p)).ToArray();
+        return present.Length == 0 ? null : string.Join(separator, present);
+    }
+}
