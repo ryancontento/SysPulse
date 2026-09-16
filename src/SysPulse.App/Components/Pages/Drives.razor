@@ -95,7 +95,9 @@
                             <div class="volume">
                                 <div class="volume-row">
                                     <span class="volume-name">@volume.Letter@(volume.Label is null ? null : $"  {volume.Label}")</span>
-                                    <span class="volume-space">@Units.UsedOfTotal(volume.UsedBytes, volume.TotalBytes)</span>
+                                    <span class="volume-space">
+                                        @Units.UsedOfTotal(volume.UsedBytes, volume.TotalBytes)<span class="volume-free @(volume.LoadPercent >= 90 ? "low" : null)">@Free(volume)</span>
+                                    </span>
                                 </div>
                                 <div class="meter @(volume.LoadPercent >= 90 ? "full" : null)">
                                     <div class="fill" style="width:@Percent(volume.LoadPercent)"></div>
@@ -241,6 +243,13 @@
         { Status: "Healthy" } => "good",
         _ => "unknown",
     };
+
+    /// <summary>Free space is what people actually look for, so it sits next to the used-of-total figure.</summary>
+    private static string Free(VolumeMetrics volume)
+    {
+        var (value, unit) = Units.Size(Math.Max(volume.TotalBytes - volume.UsedBytes, 0), minUnit: 3);
+        return $"{value} {unit} free";
+    }
 
     private static string Rate(double? bytesPerSecond)
     {

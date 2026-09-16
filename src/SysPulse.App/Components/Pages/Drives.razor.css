@@ -149,6 +149,16 @@
     font-size: 12px;
 }
 
+.volume-free {
+    margin-left: 10px;
+    color: var(--text-faint);
+}
+
+/* A nearly full volume is the one number worth noticing, so it matches the red meter. */
+.volume-free.low {
+    color: var(--danger);
+}
+
 /* Same segmented LED ladder as MetricBar, so the meters on this page match the rest of the app. */
 .meter {
     height: 8px;
