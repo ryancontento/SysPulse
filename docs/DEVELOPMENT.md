@@ -339,6 +339,17 @@ Three sources, joined on the Windows disk number:
   battery, priority 5). Otherwise → `HKCU\...\Run\SysPulse`. Both pass `--minimized`.
 - A task created elevated can only be removed by an elevated SysPulse; the UI explains that.
 
+### Tray icon (`TrayIcon.cs`)
+Click to show the window, right-click for the menu, balloon tips for rule notifications. The tooltip carries
+the current CPU, GPU, and memory readings, rebuilt on each sample.
+
+- **`NotifyIcon.Text` throws past 63 characters**, so the tooltip is three short lines and clipped as a
+  backstop. Temperature is dropped from a line when the machine doesn't report it (CPU temps need admin plus
+  PawnIO), which is also what keeps the text short on the machines most likely to overflow it.
+- Samples arrive on a background thread, so the update marshals through `Dispatcher.InvokeAsync`, and it only
+  assigns when the text actually changed rather than rewriting once a second under the cursor.
+- `TrayIcon` is registered both as itself and as `INotifier`, so `Dispose` is guarded and unsubscribes.
+
 ### Mini widget (`WidgetWindow`)
 Topmost, no taskbar entry, no activation. CPU/GPU/RAM readouts with 12-segment bars (last 2 red), network,
 THROTTLE lamp (red thermal, amber power/limited) and ALERT lamp (any rule active). Drag saves the position;
@@ -501,6 +512,6 @@ There are no automated tests yet. Changes are verified like this:
 - Per-app audio mixer; per-core CPU grid; battery card; CSV export
 - Storage follow-ups: drive temperature as a rule trigger and a Why Slow? finding, SMART history in the
   Flight Recorder, and a free-space alert
-- Tray tooltip with live readings; widget channel picker and click-through mode
+- Widget channel picker and click-through mode
 - Windows Service split (always-elevated sensors, phone dashboard without the app open); installer/auto-update
 - Unit tests for the analyzers, rule engine, units, and process grouping

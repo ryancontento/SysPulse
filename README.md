@@ -46,7 +46,8 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
   efficiency, Default is balanced, Performance is best performance. Notifications come from the
   SysPulse tray icon.
 - **Storage:** one card per physical drive, with its model, bus and media type, health status, live active
-  time, and read/write rates, plus a space meter for every volume on it. Running as administrator adds what
+  time, and read/write rates, plus a space meter for every volume on it showing used, total, and free space
+  (free turns red once a volume passes 90% full). Running as administrator adds what
   the drive reports about itself: temperature, wear (how much of its rated write endurance is used up),
   power-on hours, and uncorrected error counts. A drive that says it expects to fail is called out in red.
   Drives report different subsets of this, so rows the drive doesn't report are simply left out.
@@ -65,7 +66,8 @@ The shell is WPF and the UI is Blazor running inside `BlazorWebView` (WebView2).
   By default it only runs on trusted networks: the network you first use it on is trusted automatically, and
   on any other network (a café, a hotel) it pauses by itself until you're back.
 - **Tray:** closing the window keeps SysPulse running in the tray (turn off in Settings), so rules and
-  the Flight Recorder keep working. Right-click the tray icon to exit.
+  the Flight Recorder keep working. Hover the tray icon for current CPU, GPU, and memory readings without
+  opening the window. Right-click it to exit.
 
 SysPulse only reads from your system, with two exceptions: the audio volume and mute controls, and the
 Windows power mode when you pick a profile or a rule switches one. Picking a profile also switches to
@@ -123,8 +125,8 @@ Bump `<Version>` in `src/SysPulse.App/SysPulse.App.csproj`, commit, then push a 
 (`.github/workflows/release.yml`) builds both zips and attaches them to a GitHub Release:
 
 ```powershell
-git tag v0.5.0
-git push origin v0.5.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 ### Administrator rights
