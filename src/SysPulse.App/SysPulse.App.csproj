@@ -11,7 +11,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>SysPulse.App</RootNamespace>
     <AssemblyName>SysPulse</AssemblyName>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Regenerate with tools/New-AppIcon.ps1. -->
     <ApplicationIcon>Assets\SysPulse.ico</ApplicationIcon>
